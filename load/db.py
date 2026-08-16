@@ -18,8 +18,12 @@ Trusted_Connection=yes;
 conn = odbc.connect(connection_string)
 cursor = conn.cursor()
 
-cursor.execute("SELECT @@VERSION")
-row = cursor.fetchone()
-print(row[0])
+
+sql_query = "SELECT * FROM mart.FactDailySales"
+cursor.execute(sql_query)
+
+# 4. Fetch and display results
+for row in cursor.fetchall():
+    print(row)
 
 conn.close()

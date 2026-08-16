@@ -1,0 +1,4 @@
+Bu jadval nima uchun alohida? Chunki bitta mahsulotda bir nechta narx bo'ladi. Ularni Product ichiga sig'dirsangiz 1NF buziladi.  core.ProductPrice.
+Bu yerda tabiiy kompozit kalit ishlatilgan, surrogat emas. Nega? Chunki sana + valyuta allaqachon noyob va o'zgarmaydi. core.ExchangeRate
+Mart qatlamida Denormalizatsiya sababi:
+mart.FactDailySales jadvalida StoreName va CategoryName ustunlari ataylab 3NF qoidalariga qarshi ravishda takrorlangan. Sababi — BI va analitik so'rovlar bajarilayotganda core.Store va core.Category jadvallari bilan qayta-qayta og'ir JOIN amallarini bajarmaslik va hisobot yuklanish tezligini oshirishdir.

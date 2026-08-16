@@ -1,11 +1,11 @@
-store_code;store_name;region;city;opened_date;area_m2
+store_code;store_name;region;city;opened_date;area_m2 
 ST-001;SavdoLink Chilonzor;Toshkent shahri;Chilonzor;08.04.2020;180
 ST-002;SavdoLink Yunusobod;Toshkent shahri;Yunusobod;2021-07-15;320
 ST-003;SavdoLink Mirzo Ulug'bek;Toshkent shahri;Mirzo Ulug'bek;2022-10-22;890
 ST-004;SavdoLink Sergeli;Toshkent shahri;Sergeli;02.01.2023;320
 ST-005;  SAVDOLINK YAKKASAROY ;Toshkent shahri;Yakkasaroy;2024-04-09;410
 ST-006;SavdoLink Samarqand;Samarqand;Samarqand;2019-07-16;180
-ST-007;SavdoLink Urgut;Samarqand;Urgut;23.10.2020;320
+ST-007;SavdoLink Urgut;Samarqand;Urgut;23.10.2020;320 
 ST-008;SavdoLink Buxoro;Buxoro;Buxoro;2021-01-03;
 ST-009;SavdoLink Kogon;Buxoro;Kogon;2022-04-10;890
 ST-010;SavdoLink Farg'ona;Farg'ona;Farg'ona;17.07.2023;410

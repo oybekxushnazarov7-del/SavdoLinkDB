@@ -1,0 +1,7 @@
+-- 01_schemas.sql
+USE SavdoLinkDB;
+GO
+IF SCHEMA_ID('stg')   IS NULL EXEC('CREATE SCHEMA stg');
+IF SCHEMA_ID('core')  IS NULL EXEC('CREATE SCHEMA core');
+IF SCHEMA_ID('mart')  IS NULL EXEC('CREATE SCHEMA mart');
+IF SCHEMA_ID('audit') IS NULL EXEC('CREATE SCHEMA audit');

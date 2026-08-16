@@ -1,5 +1,23 @@
+// {
+//   "DRIVER_NAME": "SQL Server",
+//   "SERVER_NAME": "DESKTOP-EU0USCO\\SQLEXPRESS",
+//   "DATABASE_NAME": "SavdoLinkDB"
+// }
+
 {
-  "DRIVER_NAME": "SQL Server",
-  "SERVER_NAME": "DESKTOP-EU0USCO\\SQLEXPRESS",
-  "DATABASE_NAME": "SavdoLinkDB"
+  "db": {
+    "driver": "ODBC Driver 17 for SQL Server",
+    "server": "localhost",
+    "database": "SavdoLinkDB",
+    "trusted_connection": true
+  },
+  "paths": {
+    "incoming": "data/incoming",
+    "archive":  "data/archive",
+    "rejected": "data/rejected",
+    "logs":     "logs",
+    "reports":  "reports"
+  },
+  "load": { "batch_size": 1000, "encoding": "utf-8" },
+  "quality": { "max_reject_pct": 15.0 }
 }
