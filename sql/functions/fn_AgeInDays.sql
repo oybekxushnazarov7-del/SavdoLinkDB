@@ -1,0 +1,11 @@
+CREATE OR ALTER FUNCTION core.fn_AgeInDays
+(
+    @FromDate DATE,
+    @ToDate   DATE = NULL
+)
+RETURNS INT
+AS
+BEGIN
+    RETURN DATEDIFF(DAY, @FromDate, ISNULL(@ToDate, CAST(GETDATE() AS DATE)));
+END;
+GO

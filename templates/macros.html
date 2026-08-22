@@ -1,0 +1,17 @@
+{% macro kpi_card(title, value, delta) %}
+<div class="kpi">
+  <div class="kpi-title">{{ title }}</div>
+  <div class="kpi-value">{{ value }}</div>
+  {% if delta is not none %}
+  <div class="kpi-delta {{ delta | delta_class }}">{{ delta | percent }}</div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro bar_row(label, value, share) %}
+<div class="bar-row">
+  <span class="bar-label">{{ label }}</span>
+  <span class="bar"><i style="--w: {{ share }}%; width: var(--w);"></i></span>
+  <span class="bar-value">{{ value | money }}</span>
+</div>
+{% endmacro %}

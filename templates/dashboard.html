@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "macros.html" import kpi_card, bar_row %}
+
+{% block content %}
+<div class="kpi-grid">
+  {{ kpi_card("Umumiy Savdo", kpi.net_amount | money, kpi.growth_pct) }}
+  {{ kpi_card("Cheklar Soni", kpi.receipt_count | thousands, None) }}
+  {{ kpi_card("O'rtacha Chek", kpi.avg_receipt | money, None) }}
+</div>
+
+<div style="background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+  <h3>Top Mahsulotlar</h3>
+  {% if top_products %}
+    {% for item in top_products %}
+      {{ bar_row(item.product_name, item.total_sales, item.share) }}
+    {% endfor %}
+  {% else %}
+    <p>Bu davr uchun ma'lumot yo'q.</p>
+  {% endif %}
+</div>
+{% endblock %}

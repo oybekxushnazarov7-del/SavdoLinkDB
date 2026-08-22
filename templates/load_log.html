@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block heading %}Yuklashlar Jurnali{% endblock %}
+
+{% block content %}
+<table>
+  <thead>
+    <tr>
+      <th>Load ID</th>
+      <th>Vaqti</th>
+      <th>Fayl</th>
+      <th>Qatorlar</th>
+      <th>Holat</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for log in logs %}
+    <tr>
+      <td>{{ log.load_id }}</td>
+      <td>{{ log.loaded_at | uzdate }}</td>
+      <td>{{ log.file_name }}</td>
+      <td>{{ log.total_rows | thousands }}</td>
+      <td>{{ log.status }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">Yuklashlar jurnali bo'sh.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

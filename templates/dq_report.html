@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block heading %}Data Quality Hisoboti (ID: {{ load_id }}){% endblock %}
+
+{% block content %}
+<table>
+  <tr><th>Ko'rsatkich</th><th>Qiymat</th></tr>
+  <tr><td>Jami Qatorlar</td><td>{{ dq.total_rows | thousands }}</td></tr>
+  <tr><td>To'g'ri Qatorlar</td><td>{{ dq.valid_rows | thousands }}</td></tr>
+  <tr><td>Xato Qatorlar</td><td>{{ dq.invalid_rows | thousands }}</td></tr>
+  <tr><td>Holat</td><td>{{ dq.status }}</td></tr>
+</table>
+{% endblock %}

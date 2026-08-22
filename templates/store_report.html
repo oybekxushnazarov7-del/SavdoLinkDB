@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block heading %}Do'kon Hisoboti: {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-title">Jami Savdo</div>
+    <div class="kpi-value">{{ store.total_sales | money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-title">Jami Cheklar</div>
+    <div class="kpi-value">{{ store.total_receipts | thousands }}</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}SavdoLink Hisoboti{% endblock %}</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; background: #f4f6f9; margin: 20px; color: #333; }
+    header { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .kpi-grid { display: flex; gap: 15px; margin-bottom: 20px; }
+    .kpi { background: #fff; padding: 15px; border-radius: 8px; flex: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .kpi-title { font-size: 0.85em; color: #666; }
+    .kpi-value { font-size: 1.4em; font-weight: bold; margin-top: 5px; }
+    .bar-row { display: flex; align-items: center; margin: 8px 0; }
+    .bar-label { width: 200px; font-size: 0.9em; }
+    .bar { flex-grow: 1; height: 12px; background: #eef3f8; border-radius: 6px; overflow: hidden; margin: 0 10px; }
+    .bar i { display: block; height: 100%; background: #1b98e0; }
+    .up { color: green; } .down { color: red; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f8f9fa; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{% block heading %}Boshqaruv Paneli{% endblock %}</h1>
+    <p>Davr: {{ period_label }} &middot; Yaratildi: {{ generated_at | uzdate }} &middot; Manba: SavdoLinkDB</p>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>
