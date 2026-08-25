@@ -1,6 +1,12 @@
 import argparse
 import logging
+import os
+import sys
+
 from src.pipeline import ETLPipeline
+from src.extract.factory import get_extractor
+from src.validate.validator import Validator
+from src.config import load_settings, Config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,21 +49,30 @@ def build_parser() -> argparse.ArgumentParser:
 def main():
     parser = build_parser()
     args = parser.parse_args()
-
-    config = {
-        "db": {
-            "driver": "ODBC Driver 17 for SQL Server",
-            "server": "DESKTOP-EU0USCO\SQLEXPRESS",
-            "database": "SavdoLinkDB",
-            "trusted_connection": True,
-        },
-        "input_dir": "data/incoming",
-        "archive_dir": "data/archive",
-    }
+    current_directory = os.path.dirname(os.path.abspath(sys.argv[0]))
+    # config = {
+    #     "db": {
+    #         "driver": "ODBC Driver 17 for SQL Server",
+    #         "server": r"DESKTOP-EU0USCO\SQLEXPRESS",
+    #         "database": "SavdoLinkDB",
+    #         "trusted_connection": True,
+    #     },
+    #     "input_dir": "data/incoming",
+    #     "archive_dir": "data/archive",
+    # }
+    load_data = load_settings(path=os.path.join(current_directory, "config", "settings.json"))
+    config = Config(load_data)
 
     if args.command == "run":
         logger.info(f"ETL Pipeline ishga tushmoqda... (Stage: {args.stage}, Dry-run: {args.dry_run})")
-        pipeline = ETLPipeline(config)
+        
+        # Extractor factory funksiyasiga format ".csv" ko'rinishida beriladi
+        ext_path=f"{current_directory}\{config.get('paths.raw')}\*.csv"
+        logger.info(f"Extract path: {ext_path}")
+        extractor = get_extractor(ext_path)
+        validator = Validator()
+        
+        pipeline = ETLPipeline(config, extractor=extractor, validator=validator)
         stats = pipeline.run(stage=args.stage, file_path=args.file, dry_run=args.dry_run)
         logger.info(f"ETL yakunlandi. Statistika: {stats}")
 

@@ -1,9 +1,3 @@
-// {
-//   "DRIVER_NAME": "SQL Server",
-//   "SERVER_NAME": "DESKTOP-EU0USCO\\SQLEXPRESS",
-//   "DATABASE_NAME": "SavdoLinkDB"
-// }
-
 {
   "db": {
     "driver": "ODBC Driver 17 for SQL Server",
@@ -15,6 +9,7 @@
     "incoming": "data/incoming",
     "archive":  "data/archive",
     "rejected": "data/rejected",
+    "raw": "data/raw_scaled",
     "logs":     "logs",
     "reports":  "reports"
   },

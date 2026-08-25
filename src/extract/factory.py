@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Union, Dict, Type
+from src.config import Config
 from src.extract.base_extractor import BaseExtractor
 from src.extract.csv_extractor import CsvExtractor
 from src.extract.json_extractor import JsonExtractor
@@ -13,7 +14,7 @@ EXTRACTORS: Dict[str, Type[BaseExtractor]] = {
 
 
 def get_extractor(
-    path: Union[str, Path], config: any = None
+    path: Union[str, Path], config: Config = None
 ) -> BaseExtractor:
     """
     Fayl kengaytmasiga qarab tegishli extractor obyektini yaratib qaytaradi.

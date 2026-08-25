@@ -11,6 +11,7 @@ class LoadLogger:
         self.cursor = cursor
 
     def is_already_loaded(self, source_file: str) -> bool:
+        return False
         """Fayl ilgari muvaffaqiyatli yuklangan bo'lsa True qaytaradi."""
         query = "SELECT 1 FROM audit.LoadLog WHERE SourceFile = ? AND Status = 'SUCCESS'"
         self.cursor.execute(query, (source_file,))

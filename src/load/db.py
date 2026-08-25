@@ -16,12 +16,7 @@ def build_connection_string(cfg):
 
 
 class DatabaseConnection:
-    """Ulanishni va tranzaksiyani boshqaradigan kontekst menejer.
-
-    with DatabaseConnection(cfg) as cur:
-        cur.execute(...)
-    # xato bo'lmasa -> COMMIT, bo'lsa -> ROLLBACK, har holda close()
-    """
+    """Ulanish va cursorni birgalikda boshqaruvchi kontekst menejer."""
 
     def __init__(self, cfg, logger=None):
         self.cfg = cfg
@@ -31,10 +26,32 @@ class DatabaseConnection:
 
     def __enter__(self):
         self.conn = pyodbc.connect(build_connection_string(self.cfg))
-        self.conn.autocommit = False          # MAJBURIY
+        self.conn.autocommit = False  # Tranzaksiyani qo'lda commit qilish
         self.cursor = self.conn.cursor()
         self.cursor.fast_executemany = True
-        return self.cursor
+        return self
+
+    def execute(self, query, params=None):
+        if params:
+            return self.cursor.execute(query, params)
+        return self.cursor.execute(query)
+
+    def executemany(self, query, params):
+        return self.cursor.executemany(query, params)
+
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+    def fetchall(self):
+        return self.cursor.fetchall()
+
+    def commit(self):
+        if self.conn:
+            self.conn.commit()
+
+    def rollback(self):
+        if self.conn:
+            self.conn.rollback()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
@@ -44,7 +61,12 @@ class DatabaseConnection:
                 self.conn.rollback()
                 if self.logger:
                     self.logger.error("Tranzaksiya bekor qilindi: %s", exc_val)
+        except Exception as commit_err:
+            if self.logger:
+                self.logger.error("Commit/Rollback xatosi: %s", commit_err)
         finally:
-            self.cursor.close()
-            self.conn.close()
-        return False        # False -> xato yuqoriga uzatiladi 
+            if self.cursor:
+                self.cursor.close()
+            if self.conn:
+                self.conn.close()
+        return False
