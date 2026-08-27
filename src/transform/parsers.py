@@ -22,7 +22,9 @@ def parse_datetime(value):
     """
     if value is None:
         return None
-    text = value.strip()
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip()
     if not text:
         return None
     for fmt in DATETIME_FORMATS:

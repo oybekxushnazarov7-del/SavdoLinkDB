@@ -11,7 +11,7 @@ class LoadLogger:
         self.cursor = cursor
 
     def is_already_loaded(self, source_file: str) -> bool:
-        return False
+        # P-09: oldin `return False` o'lik kod edi — idempotentlik ishlamay qolgan.
         """Fayl ilgari muvaffaqiyatli yuklangan bo'lsa True qaytaradi."""
         query = "SELECT 1 FROM audit.LoadLog WHERE SourceFile = ? AND Status = 'SUCCESS'"
         self.cursor.execute(query, (source_file,))
@@ -21,12 +21,12 @@ class LoadLogger:
         """Yuklashni RUNNING holatida boshlab, LogID qaytaradi."""
         insert_query = """
             INSERT INTO audit.LoadLog (LoadId, SourceFile, Status, StartedAt)
-            VALUES (?, ?, 'RUNNING', GETDATE())
+            VALUES (?, ?, 'RUNNING', SYSDATETIME())
         """
         self.cursor.execute(insert_query, (load_id, source_file))
 
-        select_query = "SELECT @@IDENTITY"
-        self.cursor.execute(select_query)
+        # P-10: @@IDENTITY o'rniga SCOPE_IDENTITY — trigger boshqa IDENTITY bersa chalkashmasin.
+        self.cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
         row = self.cursor.fetchone()
         log_id = int(row[0]) if row and row[0] is not None else 1
 
@@ -35,6 +35,7 @@ class LoadLogger:
 
     def finish(self, log_id: int, stats: Dict[str, int], status: str = "SUCCESS") -> None:
         """Jarayonni yakuniy ko'rsatkichlar bilan yopadi."""
+        # P-10: WHERE LoadLogId = ? — aks holda barcha RUNNING qatorlar yangilanardi.
         query = """
             UPDATE audit.LoadLog
             SET Status = ?,
@@ -42,8 +43,8 @@ class LoadLogger:
                 RowsValid = ?,
                 RowsRejected = ?,
                 RowsLoaded = ?,
-                FinishedAt = GETDATE()
-            WHERE Status = 'RUNNING' AND SourceFile IS NOT NULL;
+                FinishedAt = SYSDATETIME()
+            WHERE LoadLogId = ?;
         """
         self.cursor.execute(
             query,
@@ -53,18 +54,21 @@ class LoadLogger:
                 stats.get("rows_valid", 0),
                 stats.get("rows_rejected", 0),
                 stats.get("rows_loaded", 0),
+                log_id,
             ),
         )
         logger.info(f"Load yakunlandi [LogID: {log_id}, Status: {status}]")
 
     def fail(self, log_id: int, message: str) -> None:
         """Jarayonni FAILED holatiga o'tkazadi."""
+        # S-07: ustun nomi ErrorMessage emas — audit.LoadLog da Message.
+        # P-10: WHERE LoadLogId = ? majburiy.
         query = """
             UPDATE audit.LoadLog
             SET Status = 'FAILED',
-                ErrorMessage = ?,
-                FinishedAt = GETDATE()
-            WHERE Status = 'RUNNING';
+                Message = ?,
+                FinishedAt = SYSDATETIME()
+            WHERE LoadLogId = ?;
         """
-        self.cursor.execute(query, (message[:1000] if message else "Error",))
+        self.cursor.execute(query, (message[:1000] if message else "Error", log_id))
         logger.error(f"Load muvaffaqiyatsiz [LogID: {log_id}]: {message}")

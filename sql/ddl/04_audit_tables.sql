@@ -1,3 +1,5 @@
+
+
 IF OBJECT_ID('audit.LoadLog','U') is null 
 Begin
     CREATE TABLE audit.LoadLog (
@@ -47,3 +49,16 @@ Begin
         CONSTRAINT CK_ProductHistory_ChangeType CHECK (ChangeType IN ('UPDATE', 'DELETE'))
     );
 END
+USE SavdoLinkDB_v2;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('audit.ProductHistory') AND name = 'OldUnitPrice'
+)
+BEGIN
+    ALTER TABLE audit.ProductHistory
+    ADD OldUnitPrice DECIMAL(18,2) NULL,
+        NewUnitPrice DECIMAL(18,2) NULL;
+END;
+GO

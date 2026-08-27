@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal  # PriceIsNumericRule uchun — import yetishmagan edi
 from typing import Any, Dict
 
 
@@ -37,17 +38,23 @@ class SkuRequiredRule(ValidationRule):
     severity = "ERROR"
 
     def check(self, record: dict) -> bool:
+        # P-12: CSV/transform kaliti — sku
         sku = record.get("sku")
         return sku is not None and str(sku).strip() != ""
 
 
-class DateRequiredRule(ValidationRule):
+class SaleDateRequiredRule(ValidationRule):
+    # P-12: DateRequiredRule / "date" o'rniga sale_datetime
     code = "DATE_REQUIRED"
     message = "Sana ko'rsatilishi shart"
     severity = "ERROR"
 
     def check(self, record: dict) -> bool:
-        return record.get("date") is not None
+        return record.get("sale_datetime") is not None
+
+
+# Eski importlar uchun alias (testlar/eski kod)
+DateRequiredRule = SaleDateRequiredRule
 
 
 # ==============================================================================
@@ -61,7 +68,7 @@ class QtyIsIntRule(ValidationRule):
 
     def check(self, record: dict) -> bool:
         qty = record.get("qty")
-        return isinstance(qty, int)
+        return isinstance(qty, int) and not isinstance(qty, bool)
 
 
 class PriceIsNumericRule(ValidationRule):
@@ -70,8 +77,9 @@ class PriceIsNumericRule(ValidationRule):
     severity = "ERROR"
 
     def check(self, record: dict) -> bool:
-        price = record.get("price")
-        return isinstance(price, (int, float)) and not isinstance(price, bool)
+        # P-12: "price" emas — unit_price
+        price = record.get("unit_price")
+        return isinstance(price, (int, float, Decimal)) and not isinstance(price, bool)
 
 
 # ==============================================================================
@@ -85,7 +93,7 @@ class QtyPositiveRule(ValidationRule):
 
     def check(self, record: dict) -> bool:
         qty = record.get("qty")
-        return qty is not None and isinstance(qty, (int, float)) and qty > 0
+        return isinstance(qty, int) and not isinstance(qty, bool) and qty > 0
 
 
 class DiscountRangeRule(ValidationRule):
@@ -93,11 +101,19 @@ class DiscountRangeRule(ValidationRule):
     message = "Chegirma 0% va 100% oralig'ida bo'lishi kerak"
     severity = "ERROR"
 
+    def __init__(self, min_pct: float = 0, max_pct: float = 100):
+        self.min_pct = min_pct
+        self.max_pct = max_pct
+
     def check(self, record: dict) -> bool:
-        discount = record.get("discount", 0)
+        # P-12: "discount" emas — discount_pct
+        discount = record.get("discount_pct")
         if discount is None:
-            return True  # Chegirma bo'lmasa qoida buzilmadi deb hisoblanadi
-        return 0 <= discount <= 100
+            return True
+        try:
+            return self.min_pct <= float(discount) <= self.max_pct
+        except (TypeError, ValueError):
+            return False
 
 
 # ==============================================================================
@@ -110,13 +126,28 @@ class ReturnAfterSaleRule(ValidationRule):
     severity = "ERROR"
 
     def check(self, record: dict) -> bool:
-        sale_date = record.get("sale_date") or record.get("date")
+        # P-12: sale_datetime
+        sale_date = record.get("sale_datetime")
         return_date = record.get("return_date")
 
         if not sale_date or not return_date:
-            return True  # Har ikkala sana ham mavjud bo'lgandagina mantiqiy tekshiriladi
+            return True
 
         return return_date >= sale_date
+
+
+class CashierStoreRule(ValidationRule):
+    # P-14: validation_rules.json dagi CASHIER_STORE — sinf yo'q edi
+    code = "CASHIER_STORE"
+    message = "Kassir o'zi biriktirilmagan do'konda savdo qilmoqda"
+    severity = "WARNING"
+
+    def check(self, record: dict) -> bool:
+        expected = record.get("cashier_store_code")
+        actual = record.get("store_code")
+        if expected is None or actual is None:
+            return True  # boyitish bo'lmasa ogohlantirmaymiz
+        return str(expected).strip().upper() == str(actual).strip().upper()
 
 
 # ==============================================================================
@@ -129,8 +160,7 @@ class SkuExistsRule(ValidationRule):
     severity = "ERROR"
 
     def check(self, record: dict) -> bool:
-        # catalogue_price mavjudligi orqali katalogda mahsulot borligi tekshiriladi
-        # (enrichers.py jarayonidan keyin)
+        # enrichers.py dan keyin catalog_price / in_catalog
         return record.get("catalog_price") is not None or record.get("in_catalog") is True
 
 
@@ -143,13 +173,34 @@ class PriceDeviationRule(ValidationRule):
     message = "Sotuv narxi katalog narxidan keskin farq qiladi"
     severity = "WARNING"
 
+    def __init__(self, max_factor: float = 1.5):
+        # P-15: chegara kodda 0.50 qattiq yozilmasin — konfiguratsiyadan keladi
+        self.max_factor = max_factor
+
     def check(self, record: dict) -> bool:
-        sale_price = record.get("price")
+        # P-12: unit_price
+        sale_price = record.get("unit_price")
         catalog_price = record.get("catalog_price")
 
         if sale_price is None or catalog_price is None or catalog_price == 0:
             return True
 
-        # Narx o'rtasidagi farq 50% dan yuqori bo'lsa ogohlantirish beradi
-        deviation = abs(sale_price - catalog_price) / catalog_price
-        return deviation <= 0.50 
+        try:
+            sale = float(sale_price)
+            catalog = float(catalog_price)
+        except (TypeError, ValueError):
+            return True
+
+        return abs(sale - catalog) / catalog <= (self.max_factor - 1)
+
+
+# P-04: Validator argumentsiz chaqirilmasin — DEFAULT_RULES oshkora uzatiladi
+DEFAULT_RULES = [
+    SkuRequiredRule(),
+    SaleDateRequiredRule(),
+    QtyIsIntRule(),
+    QtyPositiveRule(),
+    PriceIsNumericRule(),
+    DiscountRangeRule(),
+    PriceDeviationRule(),
+]

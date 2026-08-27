@@ -1,6 +1,11 @@
+# P-03: ConfigError ikkita argument talab qilmasligi kerak —
+# chaqiruvlar faqat xabar matni uzatadi.
 class SavdoLinkError(Exception):
     """Loyihadagi barcha xatolarning bazasi."""
-    pass
+
+
+class ConfigError(SavdoLinkError):
+    """Sozlama fayli yo'q yoki noto'g'ri."""
 
 
 class ExtractError(SavdoLinkError):
@@ -11,8 +16,10 @@ class ExtractError(SavdoLinkError):
         self.reason = reason
         super().__init__(f"{path}: {reason}")
 
-class ConfigError(SavdoLinkError):
-    def __init__(self, key, reason):
-        self.key = key
-        self.reason = reason
-        super().__init__(f"{key}:{reason}")
+
+class ValidationError(SavdoLinkError):
+    """Ma'lumot qoidaga zid."""
+
+
+class LoadError(SavdoLinkError):
+    """Bazaga yozishda xato."""

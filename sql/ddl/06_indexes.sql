@@ -1,42 +1,54 @@
--- Vazifasi: Analitik so'rovlar va JOIN operatsiyalarini optimizatsiya qilish uchun indekslar.
 
-USE SavdoLinkDB;
+
+-- 1. SalesHeader
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SalesHeader_SaleDate' AND object_id = OBJECT_ID('core.SalesHeader'))
+    CREATE NONCLUSTERED INDEX IX_SalesHeader_SaleDate
+        ON core.SalesHeader (SaleDateTime)
+        INCLUDE (StoreId, EmployeeId);
 GO
 
--- 1. SalesHeader: Sana va Do'kon bo'yicha filtrlar uchun
-CREATE NONCLUSTERED INDEX IX_SalesHeader_SaleDate 
-    ON core.SalesHeader (SaleDateTime) 
-    INCLUDE (StoreId, EmployeeId);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SalesHeader_StoreId' AND object_id = OBJECT_ID('core.SalesHeader'))
+    CREATE NONCLUSTERED INDEX IX_SalesHeader_StoreId
+        ON core.SalesHeader (StoreId, SaleDateTime);
+GO
 
-CREATE NONCLUSTERED INDEX IX_SalesHeader_StoreId 
-    ON core.SalesHeader (StoreId, SaleDateTime);
+-- 2. SalesDetail (S-04: Quantity → Qty)
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SalesDetail_HeaderId' AND object_id = OBJECT_ID('core.SalesDetail'))
+    CREATE NONCLUSTERED INDEX IX_SalesDetail_HeaderId
+        ON core.SalesDetail (SalesHeaderId)
+        INCLUDE (ProductId, Qty, LineAmount);
+GO
 
--- 2. SalesDetail: Covering index (JOIN lar uchun asosiy jadvalga tushmaslikni ta'minlaydi)
-CREATE NONCLUSTERED INDEX IX_SalesDetail_HeaderId 
-    ON core.SalesDetail (SalesHeaderId) 
-    INCLUDE (ProductId, Quantity, LineAmount);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SalesDetail_ProductId' AND object_id = OBJECT_ID('core.SalesDetail'))
+    CREATE NONCLUSTERED INDEX IX_SalesDetail_ProductId
+        ON core.SalesDetail (ProductId)
+        INCLUDE (Qty, UnitPrice, LineAmount);
+GO
 
-CREATE NONCLUSTERED INDEX IX_SalesDetail_ProductId 
-    ON core.SalesDetail (ProductId) 
-    INCLUDE (Quantity, UnitPrice, LineAmount);
+-- 3. Product
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Product_CategoryId' AND object_id = OBJECT_ID('core.Product'))
+    CREATE NONCLUSTERED INDEX IX_Product_CategoryId
+        ON core.Product (CategoryId)
+        INCLUDE (Sku, ProductName);
+GO
 
--- 3. Product: Kategoriya va Sku bo'yicha tezkor qidirish
-CREATE NONCLUSTERED INDEX IX_Product_CategoryId 
-    ON core.Product (CategoryId) 
-    INCLUDE (Sku, ProductName);
+-- 4. Employee
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_StoreId' AND object_id = OBJECT_ID('core.Employee'))
+    CREATE NONCLUSTERED INDEX IX_Employee_StoreId
+        ON core.Employee (StoreId)
+        INCLUDE (EmpCode, FullName);
+GO
 
--- 4. Employee: Do'konlar bo'yicha hodimlarni guruhlash
-CREATE NONCLUSTERED INDEX IX_Employee_StoreId 
-    ON core.Employee (StoreId) 
-    INCLUDE (EmpCode, FullName);
+-- 5. Returns (S-04: Quantity → Qty)
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Returns_HeaderId' AND object_id = OBJECT_ID('core.Returns'))
+    CREATE NONCLUSTERED INDEX IX_Returns_HeaderId
+        ON core.Returns (SalesHeaderId, ProductId)
+        INCLUDE (Qty);
+GO
 
--- 5. Returns: Qaytarishlarni hisoblash uchun
-CREATE NONCLUSTERED INDEX IX_Returns_HeaderId 
-    ON core.Returns (SalesHeaderId, ProductId) 
-    INCLUDE (Quantity);
-
--- 6. ProductPrice: Sana bo'yicha narx variantlarini aniqlash
-CREATE NONCLUSTERED INDEX IX_ProductPrice_Lookup 
-    ON core.ProductPrice (ProductId, ValidFrom) 
-    INCLUDE (Price);
+-- 6. ProductPrice
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ProductPrice_Lookup' AND object_id = OBJECT_ID('core.ProductPrice'))
+    CREATE NONCLUSTERED INDEX IX_ProductPrice_Lookup
+        ON core.ProductPrice (ProductId, ValidFrom)
+        INCLUDE (Price);
 GO

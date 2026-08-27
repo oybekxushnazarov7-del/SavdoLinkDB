@@ -1,5 +1,5 @@
 -- 01_schemas.sql
-USE SavdoLinkDB;
+USE SavdoLinkDB_v2;
 GO
 IF SCHEMA_ID('stg')   IS NULL EXEC('CREATE SCHEMA stg');
 IF SCHEMA_ID('core')  IS NULL EXEC('CREATE SCHEMA core');

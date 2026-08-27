@@ -1,3 +1,5 @@
+-- stg.RawSales: StoreCode/Sku/CashierId (EmpCode) — surrogat ID emas.
+-- core.SalesHeader: EmployeeId, PaymentType; LineAmount — computed (INSERT qilinmaydi).
 CREATE OR ALTER PROCEDURE core.usp_LoadSales
     @LoadId        NVARCHAR(50),
     @HeadersLoaded INT = 0 OUTPUT,
@@ -13,59 +15,63 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        -- 1. Vaqtinchalik jadvalga xatolar va tiplardan tozalangan ma'lumotni olish
-        SELECT 
-            LTRIM(RTRIM(ReceiptNo)) AS ReceiptNo,
-            TRY_CONVERT(INT, StoreId) AS StoreId,
-            TRY_CONVERT(INT, CashierId) AS CashierId,
-            TRY_CONVERT(DATETIME2(0), SaleDateTime, 120) AS SaleDateTime,
-            TRY_CONVERT(INT, ProductId) AS ProductId,
-            TRY_CONVERT(INT, Qty) AS Qty,
-            TRY_CONVERT(DECIMAL(12,2), REPLACE(UnitPrice, ',', '.')) AS UnitPrice,
-            TRY_CONVERT(DECIMAL(5,2), REPLACE(DiscountPct, ',', '.')) AS DiscountPct
+        SELECT
+            LTRIM(RTRIM(rs.ReceiptNo)) AS ReceiptNo,
+            st.StoreId,
+            e.EmployeeId,
+            COALESCE(
+                TRY_CONVERT(DATETIME2(0), rs.SaleDateTime, 120),
+                TRY_CONVERT(DATETIME2(0), rs.SaleDateTime, 104)
+            ) AS SaleDateTime,
+            p.ProductId,
+            TRY_CONVERT(INT, rs.Qty) AS Qty,
+            TRY_CONVERT(DECIMAL(12,2), REPLACE(rs.UnitPrice, ',', '.')) AS UnitPrice,
+            ISNULL(TRY_CONVERT(DECIMAL(5,2), REPLACE(rs.DiscountPct, ',', '.')), 0) AS DiscountPct,
+            UPPER(LTRIM(RTRIM(rs.PaymentType))) AS PaymentType
         INTO #TempSales
-        FROM stg.RawSales
-        WHERE LoadId = @LoadId
-          AND ReceiptNo IS NOT NULL 
-          AND StoreId IS NOT NULL 
-          AND ProductId IS NOT NULL;
+        FROM stg.RawSales rs
+        JOIN core.Store st ON st.StoreCode = LTRIM(RTRIM(rs.StoreCode))
+        JOIN core.Employee e ON e.EmpCode = LTRIM(RTRIM(rs.CashierId))
+        JOIN core.Product p ON p.Sku = LTRIM(RTRIM(rs.Sku))
+        WHERE rs.LoadId = @LoadId
+          AND NULLIF(LTRIM(RTRIM(rs.ReceiptNo)), '') IS NOT NULL;
 
-        -- 2. Header (Sarlavha) qatlamini MERGE qilish
         MERGE core.SalesHeader AS tgt
         USING (
-            SELECT DISTINCT ReceiptNo, StoreId, CashierId, SaleDateTime
+            SELECT DISTINCT ReceiptNo, StoreId, EmployeeId, SaleDateTime, PaymentType
             FROM #TempSales
+            WHERE SaleDateTime IS NOT NULL
+              AND PaymentType IN ('CASH', 'CARD', 'TRANSFER')
         ) AS src
             ON tgt.ReceiptNo = src.ReceiptNo AND tgt.StoreId = src.StoreId
         WHEN NOT MATCHED THEN
-            INSERT (ReceiptNo, StoreId, CashierId, SaleDateTime, LoadId)
-            VALUES (src.ReceiptNo, src.StoreId, src.CashierId, src.SaleDateTime, @LoadId);
+            INSERT (ReceiptNo, StoreId, EmployeeId, SaleDateTime, PaymentType, LoadId)
+            VALUES (src.ReceiptNo, src.StoreId, src.EmployeeId, src.SaleDateTime, src.PaymentType, @LoadId);
 
         SET @HeadersLoaded = @@ROWCOUNT;
 
-        -- 3. Detail (Tafsilot) qatlamini MERGE qilish
         MERGE core.SalesDetail AS tgt
         USING (
-            SELECT 
+            SELECT
                 sh.SalesHeaderId,
                 ts.ProductId,
                 ts.Qty,
                 ts.UnitPrice,
-                ts.DiscountPct,
-                ROUND(ts.Qty * ts.UnitPrice * (1 - ISNULL(ts.DiscountPct, 0) / 100.0), 2) AS LineAmount
+                ts.DiscountPct
             FROM #TempSales ts
-            JOIN core.SalesHeader sh ON sh.ReceiptNo = ts.ReceiptNo AND sh.StoreId = ts.StoreId
+            JOIN core.SalesHeader sh
+                ON sh.ReceiptNo = ts.ReceiptNo AND sh.StoreId = ts.StoreId
+            WHERE ts.Qty IS NOT NULL AND ts.UnitPrice IS NOT NULL
         ) AS src
             ON tgt.SalesHeaderId = src.SalesHeaderId AND tgt.ProductId = src.ProductId
         WHEN MATCHED THEN
-            UPDATE SET 
+            UPDATE SET
                 tgt.Qty = src.Qty,
                 tgt.UnitPrice = src.UnitPrice,
-                tgt.DiscountPct = src.DiscountPct,
-                tgt.LineAmount = src.LineAmount
+                tgt.DiscountPct = src.DiscountPct
         WHEN NOT MATCHED THEN
-            INSERT (SalesHeaderId, ProductId, Qty, UnitPrice, DiscountPct, LineAmount)
-            VALUES (src.SalesHeaderId, src.ProductId, src.Qty, src.UnitPrice, src.DiscountPct, src.LineAmount);
+            INSERT (SalesHeaderId, ProductId, Qty, UnitPrice, DiscountPct)
+            VALUES (src.SalesHeaderId, src.ProductId, src.Qty, src.UnitPrice, src.DiscountPct);
 
         SET @DetailsLoaded = @@ROWCOUNT;
 

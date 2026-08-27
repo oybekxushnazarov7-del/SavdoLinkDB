@@ -2,18 +2,20 @@
    Fayl   : q03_above_avg_cashiers.sql
    Savol  : O'rtachadan yuqori savdo qilgan kassirlar
    Texnika: Skalyar Subquery
+   Eslatma: core.Cashier yo'q — core.Employee (S-11 bilan mos)
    ------------------------------------------------------------------ */
 WITH CashierSales AS (
-    SELECT 
-        c.CashierId,
-        c.CashierName,
+    SELECT
+        e.EmployeeId,
+        e.FullName AS CashierName,
         ISNULL(SUM(sd.LineAmount), 0) AS TotalSales
-    FROM core.Cashier c
-    LEFT JOIN core.SalesHeader sh ON sh.CashierId = c.CashierId
+    FROM core.Employee e
+    LEFT JOIN core.SalesHeader sh ON sh.EmployeeId = e.EmployeeId
     LEFT JOIN core.SalesDetail sd ON sd.SalesHeaderId = sh.SalesHeaderId
-    GROUP BY c.CashierId, c.CashierName
+    WHERE e.Position IN ('Kassir', 'Sotuvchi')
+    GROUP BY e.EmployeeId, e.FullName
 )
-SELECT 
+SELECT
     CashierName,
     TotalSales
 FROM CashierSales

@@ -1,1 +1,9 @@
 archive
+__pycache__/
+*.pyc
+venv/
+.venv/
+logs/
+data/
+reports/
+.pytest_cache/

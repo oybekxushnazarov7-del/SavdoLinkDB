@@ -2,13 +2,36 @@ from collections import Counter
 import json
 from typing import Dict, Iterable, List, Tuple
 
-from src.validate.rules import ValidationRule
-import src.validate.rules as rule_modules
+from src.exceptions import ConfigError
+from src.validate.rules import (
+    ValidationRule,
+    SkuRequiredRule,
+    SaleDateRequiredRule,
+    QtyIsIntRule,
+    QtyPositiveRule,
+    PriceIsNumericRule,
+    DiscountRangeRule,
+    PriceDeviationRule,
+    CashierStoreRule,
+    SkuExistsRule,
+    ReturnAfterSaleRule,
+)
 
 
-# ==============================================================================
-# VALIDATION RESULT SINF
-# ==============================================================================
+# P-14: JSON da class_name yo'q — qoida KODI bo'yicha xarita
+RULE_REGISTRY = {
+    "SKU_REQUIRED": SkuRequiredRule,
+    "DATE_REQUIRED": SaleDateRequiredRule,
+    "QTY_IS_INT": QtyIsIntRule,
+    "QTY_POSITIVE": QtyPositiveRule,
+    "PRICE_IS_NUMERIC": PriceIsNumericRule,
+    "DISCOUNT_RANGE": DiscountRangeRule,
+    "PRICE_DEVIATION": PriceDeviationRule,
+    "CASHIER_STORE": CashierStoreRule,
+    "SKU_EXISTS": SkuExistsRule,
+    "RETURN_AFTER_SALE": ReturnAfterSaleRule,
+}
+
 
 class ValidationResult:
     """Tekshiruv natijasini saqlovchi va qayta ishlovchi obyekt."""
@@ -29,11 +52,9 @@ class ValidationResult:
         return len(self.errors) == 0
 
     def __bool__(self) -> bool:
-        """'if result:' ko'rinishida ishlashi uchun is_valid qiymatini qaytaradi."""
         return self.is_valid
 
     def __len__(self) -> int:
-        """Jami buzilgan (ERROR + WARNING) qoidalar sonini qaytaradi."""
         return len(self.errors) + len(self.warnings)
 
     def __repr__(self) -> str:
@@ -43,24 +64,19 @@ class ValidationResult:
         )
 
 
-# ==============================================================================
-# VALIDATOR SINF
-# ==============================================================================
-
 class Validator:
-    """Ma'lumotlar oqimini qoidalar to'plami bo'yicha tekshiruvchi va statistika yig'uvchi sinf."""
+    """Ma'lumotlar oqimini qoidalar to'plami bo'yicha tekshiruvchi sinf."""
 
     def __init__(self, rules: List[ValidationRule]) -> None:
+        # P-04: rules majburiy — argumentsiz Validator() TypeError
         self.rules = rules
         self._stats = Counter()
 
     def validate(self, record: dict) -> ValidationResult:
-        """Bitta yozuvni barcha qoidalar bo'yicha tekshiradi."""
         errors: List[ValidationRule] = []
         warnings: List[ValidationRule] = []
 
         for rule in self.rules:
-            # Agar qoida buzilsa (check False qaytarsa)
             if not rule.check(record):
                 self._stats[rule.code] += 1
                 if rule.severity == "ERROR":
@@ -71,10 +87,6 @@ class Validator:
         return ValidationResult(record=record, errors=errors, warnings=warnings)
 
     def validate_batch(self, records: Iterable[dict]) -> Tuple[List[dict], List[dict]]:
-        """Ko'p sonli yozuvlarni birdaniga tekshirib, ikkita ro'yxatga ajratadi.
-        
-        Qaytaradi: (yaroqli_yozuvlar, rad_etilgan_yozuvlar)
-        """
         valid_records = []
         rejected_records = []
 
@@ -83,7 +95,6 @@ class Validator:
             if result.is_valid:
                 valid_records.append(record)
             else:
-                # Rad etilgan yozuvga buzilgan qoidalar haqida ma'lumot qistirib ketish
                 rejected_item = record.copy()
                 rejected_item["_errors"] = [e.code for e in result.errors]
                 rejected_records.append(rejected_item)
@@ -92,21 +103,34 @@ class Validator:
 
     @property
     def stats(self) -> Dict[str, int]:
-        """Har bir qoida necha marta buzilganligining statistikasini qaytaradi."""
         return dict(self._stats)
 
     @classmethod
     def from_config(cls, path: str) -> "Validator":
-        """JSON konfiguratsiya faylidan qoidalarni o'qib, Validator obyektini quradi."""
+        # P-14: rules — lug'at {CODE: {enabled, severity, ...}}, ro'yxat emas
         with open(path, "r", encoding="utf-8") as f:
-            config = json.load(f)
+            cfg = json.load(f)
 
-        rules_list = []
-        # JSON fayldagi qoida nomlarini tegishli sinfga dinamik ravishda bog'lash
-        for rule_cfg in config.get("rules", []):
-            rule_class_name = rule_cfg.get("class_name")
-            if hasattr(rule_modules, rule_class_name):
-                rule_cls = getattr(rule_modules, rule_class_name)
-                rules_list.append(rule_cls())
+        rules = []
+        for code, params in cfg.get("rules", {}).items():
+            if not params.get("enabled", True):
+                continue
+            rule_cls = RULE_REGISTRY.get(code)
+            if rule_cls is None:
+                raise ConfigError(f"Noma'lum qoida kodi: {code}")
 
-        return cls(rules=rules_list)
+            # P-15: PriceDeviationRule max_factor konfiguratsiyadan
+            if code == "PRICE_DEVIATION":
+                rule = rule_cls(max_factor=float(params.get("max_factor", 1.5)))
+            elif code == "DISCOUNT_RANGE":
+                rule = rule_cls(
+                    min_pct=float(params.get("min", 0)),
+                    max_pct=float(params.get("max", 100)),
+                )
+            else:
+                rule = rule_cls()
+
+            rule.severity = params.get("severity", rule.severity)
+            rules.append(rule)
+
+        return cls(rules)

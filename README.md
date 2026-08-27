@@ -1,9 +1,9 @@
 # SavdoLink — Retail ETL & Analytical Reporting System
 
-SavdoLink — chakana savdo tarmog'ining operatsion ma'lumotlarini (CSV/JSON formatdagi cheklar va qaytarishlar) yig'uvchi, tozalovchi, Data Quality validsiyasidan o'tkazuvchi va SQL Server dWH hamda HTML analitik panellarini shakllantiruvchi ETL quvuri[cite: 3].
+SavdoLink — chakana savdo tarmog'ining operatsion ma'lumotlarini (CSV/JSON formatdagi cheklar va qaytarishlar) yig'uvchi, tozalovchi, Data Quality validsiyasidan o'tkazuvchi va SQL Server dWH hamda HTML analitik panellarini shakllantiruvchi ETL quvuri.
 
 ## Tizim Arxitekturasi
-`CSV/JSON Data Sources` ➔ `Extract (Python)` ➔ `Transform & DQ Validation` ➔ `Load (MS SQL Server Core)` ➔ `Mart Aggregation (Stored Procedures)` ➔ `Jinja2 HTML Reports & Dashboard`[cite: 3]
+`CSV/JSON Data Sources` ➔ `Extract (Python)` ➔ `Transform & DQ Validation` ➔ `Load (MS SQL Server Core)` ➔ `Mart Aggregation (Stored Procedures)` ➔ `Jinja2 HTML Reports & Dashboard`
 
 ---
 

@@ -32,3 +32,7 @@ Tranzaksion Protseduralar: Staging'ni xavfsiz tozalash (usp_TruncateStaging), sp
 Yordamchi Funksiyalar va Triggerlar: Net-narxni hisoblash (fn_NetPrice), telefon raqamlarini niqoblash (fn_MaskPhone), mahsulot narxi va ma'lumotlari o'zgarganda audit tarixini yurituvchi trigger (tr_Product_Audit) hamda 50% dan yuqori noqonuniy chegirmalarni bloklovchi trigger (tr_SalesDetail_Guard) yaratildi.
 
 Tahliliy Ko'rinishlar (Views): Hisobotlar va tahlillar uchun kerakli bo'lgan 5 ta asosiy ko'rinish (vw_AuditLogs, vw_CashierPerformance, vw_DailySalesSummary, vw_ProductPerformance, vw_StoreOverview) bazadagi DDL sxemasiga 100% moslab sozlandi va barcha ustun xatoliklari bartaraf etildi.
+---
+Tuzatish sessiyasi (qo'llanma v2): P-01..P-18, S-01..S-14, D-01..D-06, R-08/R-09.
+Data Pack data/incoming/ ga chiqarildi; StagingLoader/LoadLog/SQL MERGE DDL ga moslandi; pytest 44 passed.
+

@@ -1,8 +1,8 @@
 {
   "db": {
     "driver": "ODBC Driver 17 for SQL Server",
-    "server": "localhost",
-    "database": "SavdoLinkDB",
+    "server": ".\\SQLEXPRESS",
+    "database": "SavdoLinkDB_v2",
     "trusted_connection": true
   },
   "paths": {

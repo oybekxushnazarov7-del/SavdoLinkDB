@@ -1,12 +1,13 @@
 """
 Fayl: tests/test_rules.py
-Vazifasi: src/validate/rules.py modulidagi biznes va validatsiya qoidalarini sinash.
+Vazifasi: src/validate/rules.py — P-12 ustun nomlari bilan.
 """
 from datetime import datetime, timedelta
+from decimal import Decimal
 import pytest
 
 from src.validate.rules import (
-    DateRequiredRule,
+    SaleDateRequiredRule,
     DiscountRangeRule,
     PriceDeviationRule,
     PriceIsNumericRule,
@@ -15,13 +16,12 @@ from src.validate.rules import (
     ReturnAfterSaleRule,
     SkuExistsRule,
     SkuRequiredRule,
+    CashierStoreRule,
     ValidationRule,
 )
 
 
 def test_base_validation_rule_not_implemented():
-    """Bazaviy ValidationRule check() funksiyasi chaqirilganda NotImplementedError berishi kerak."""
-
     class CustomRule(ValidationRule):
         pass
 
@@ -38,10 +38,10 @@ def test_sku_required_rule():
     assert rule.check({}) is False
 
 
-def test_date_required_rule():
-    rule = DateRequiredRule()
-    assert rule.check({"date": "2026-03-14"}) is True
-    assert rule.check({"date": None}) is False
+def test_sale_date_required_rule():
+    rule = SaleDateRequiredRule()
+    assert rule.check({"sale_datetime": datetime(2026, 3, 14)}) is True
+    assert rule.check({"sale_datetime": None}) is False
     assert rule.check({}) is False
 
 
@@ -54,10 +54,10 @@ def test_qty_is_int_rule():
 
 def test_price_is_numeric_rule():
     rule = PriceIsNumericRule()
-    assert rule.check({"price": 100}) is True
-    assert rule.check({"price": 99.99}) is True
-    assert rule.check({"price": True}) is False  # Bool tekshiruvi
-    assert rule.check({"price": "100"}) is False
+    assert rule.check({"unit_price": 100}) is True
+    assert rule.check({"unit_price": Decimal("99.99")}) is True
+    assert rule.check({"unit_price": True}) is False
+    assert rule.check({"unit_price": "100"}) is False
 
 
 def test_qty_positive_rule():
@@ -70,12 +70,12 @@ def test_qty_positive_rule():
 
 def test_discount_range_rule():
     rule = DiscountRangeRule()
-    assert rule.check({"discount": 0}) is True
-    assert rule.check({"discount": 50}) is True
-    assert rule.check({"discount": 100}) is True
-    assert rule.check({"discount": -10}) is False
-    assert rule.check({"discount": 150}) is False
-    assert rule.check({}) is True  # Chegirma ko'rsatilmanganda True qaytadi
+    assert rule.check({"discount_pct": 0}) is True
+    assert rule.check({"discount_pct": 50}) is True
+    assert rule.check({"discount_pct": 100}) is True
+    assert rule.check({"discount_pct": -10}) is False
+    assert rule.check({"discount_pct": 150}) is False
+    assert rule.check({}) is True
 
 
 def test_return_after_sale_rule():
@@ -83,9 +83,9 @@ def test_return_after_sale_rule():
     now = datetime.now()
     yesterday = now - timedelta(days=1)
 
-    assert rule.check({"sale_date": yesterday, "return_date": now}) is True
-    assert rule.check({"sale_date": now, "return_date": yesterday}) is False
-    assert rule.check({"sale_date": now}) is True  # Ikkala sana bo'lmasa True
+    assert rule.check({"sale_datetime": yesterday, "return_date": now}) is True
+    assert rule.check({"sale_datetime": now, "return_date": yesterday}) is False
+    assert rule.check({"sale_datetime": now}) is True
 
 
 def test_sku_exists_rule():
@@ -96,8 +96,16 @@ def test_sku_exists_rule():
 
 
 def test_price_deviation_rule():
-    rule = PriceDeviationRule()
-    assert rule.check({"price": 100, "catalog_price": 100}) is True
-    assert rule.check({"price": 140, "catalog_price": 100}) is True  # 40% farq (<= 50%)
-    assert rule.check({"price": 200, "catalog_price": 100}) is False  # 100% farq (> 50%)
-    assert rule.check({"price": 100, "catalog_price": 0}) is True  # Bo'lishda 0 bo'lsa True
+    # P-15: max_factor=1.5 → 50% farq gacha OK
+    rule = PriceDeviationRule(max_factor=1.5)
+    assert rule.check({"unit_price": 100, "catalog_price": 100}) is True
+    assert rule.check({"unit_price": 140, "catalog_price": 100}) is True
+    assert rule.check({"unit_price": 200, "catalog_price": 100}) is False
+    assert rule.check({"unit_price": 100, "catalog_price": 0}) is True
+
+
+def test_cashier_store_rule():
+    rule = CashierStoreRule()
+    assert rule.check({"store_code": "ST-001", "cashier_store_code": "ST-001"}) is True
+    assert rule.check({"store_code": "ST-001", "cashier_store_code": "ST-002"}) is False
+    assert rule.check({"store_code": "ST-001"}) is True  # enrich yo'q

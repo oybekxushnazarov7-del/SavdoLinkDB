@@ -1,3 +1,4 @@
+
 IF OBJECT_ID('stg.RawSales','U') is null 
 Begin
     CREATE TABLE stg.RawSales (
@@ -71,11 +72,10 @@ Begin
         SourceFile NVARCHAR(260) NOT NULL,
         RowNum INT NOT NULL,
         LoadedAt DATETIME2(0) NOT NULL CONSTRAINT DF_RawCategories_LoadedAt DEFAULT SYSDATETIME(),
-
         CategoryCode NVARCHAR(200) NULL,
         CategoryName NVARCHAR(200) NULL,
         ParentCategoryCode NVARCHAR(200) NULL,
-
+        [Level] tinyint not null,
         CONSTRAINT PK_RawCategories PRIMARY KEY CLUSTERED (RawCategoryId)
     );
 END
@@ -158,7 +158,8 @@ Begin
     );
 END
 
-IF OBJECT_ID('stg.RawEmployees','U') is null 
+-- S-03: nusxa xatosi — IF RawEmployees edi, CREATE RawRates; RawRates hech qachon yaratilmas edi
+IF OBJECT_ID('stg.RawRates','U') is null 
 Begin
     CREATE TABLE stg.RawRates (
         RawRateId BIGINT IDENTITY(1,1) NOT NULL,

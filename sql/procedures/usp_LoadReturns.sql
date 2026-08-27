@@ -1,3 +1,4 @@
+-- stg.RawReturns: ReturnId/ReceiptNo/StoreCode/Sku — core.Returns: ReturnCode + FK.
 CREATE OR ALTER PROCEDURE core.usp_LoadReturns
     @LoadId     NVARCHAR(50),
     @RowsLoaded INT = 0 OUTPUT
@@ -14,24 +15,34 @@ BEGIN
 
         MERGE core.Returns AS tgt
         USING (
-            SELECT 
-                TRY_CONVERT(INT, ReturnId) AS ReturnId,
-                TRY_CONVERT(INT, SalesHeaderId) AS SalesHeaderId,
-                TRY_CONVERT(INT, ProductId) AS ProductId,
-                TRY_CONVERT(DATETIME2(0), ReturnDateTime, 120) AS ReturnDateTime,
-                TRY_CONVERT(INT, Qty) AS Qty,
-                LTRIM(RTRIM(Reason)) AS Reason
-            FROM stg.RawReturns
-            WHERE LoadId = @LoadId AND ReturnId IS NOT NULL
+            SELECT
+                LTRIM(RTRIM(rr.ReturnId)) AS ReturnCode,
+                sh.SalesHeaderId,
+                p.ProductId,
+                TRY_CONVERT(INT, rr.Qty) AS Qty,
+                LTRIM(RTRIM(rr.Reason)) AS Reason,
+                COALESCE(
+                    TRY_CONVERT(DATE, rr.ReturnDate, 23),
+                    TRY_CONVERT(DATE, rr.ReturnDate, 104)
+                ) AS ReturnDate
+            FROM stg.RawReturns rr
+            JOIN core.Store st ON st.StoreCode = LTRIM(RTRIM(rr.StoreCode))
+            JOIN core.SalesHeader sh
+                ON sh.ReceiptNo = LTRIM(RTRIM(rr.ReceiptNo))
+               AND sh.StoreId = st.StoreId
+            JOIN core.Product p ON p.Sku = LTRIM(RTRIM(rr.Sku))
+            WHERE rr.LoadId = @LoadId
+              AND NULLIF(LTRIM(RTRIM(rr.ReturnId)), '') IS NOT NULL
         ) AS src
-            ON tgt.ReturnId = src.ReturnId
+            ON tgt.ReturnCode = src.ReturnCode
         WHEN MATCHED THEN
-            UPDATE SET 
+            UPDATE SET
                 tgt.Qty = src.Qty,
-                tgt.Reason = src.Reason
-        WHEN NOT MATCHED THEN
-            INSERT (ReturnId, SalesHeaderId, ProductId, ReturnDateTime, Qty, Reason, LoadId)
-            VALUES (src.ReturnId, src.SalesHeaderId, src.ProductId, src.ReturnDateTime, src.Qty, src.Reason, @LoadId);
+                tgt.Reason = src.Reason,
+                tgt.ReturnDate = src.ReturnDate
+        WHEN NOT MATCHED AND src.ReturnDate IS NOT NULL AND src.Qty IS NOT NULL THEN
+            INSERT (ReturnCode, SalesHeaderId, ProductId, Qty, Reason, ReturnDate)
+            VALUES (src.ReturnCode, src.SalesHeaderId, src.ProductId, src.Qty, src.Reason, src.ReturnDate);
 
         SET @RowsLoaded = @@ROWCOUNT;
 

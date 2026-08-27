@@ -43,7 +43,8 @@ def delta_class(value) -> str:
         return "up"
 
 def register_filters(env):
-    env.filters("money") = money 
+    # P-01: env.filters — lug'at; env.filters("money") = ... SyntaxError beradi
+    env.filters["money"] = money
     env.filters["percent"] = percent
     env.filters["uzdate"] = uzdate
     env.filters["thousands"] = thousands

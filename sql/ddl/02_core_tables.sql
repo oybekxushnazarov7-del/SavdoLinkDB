@@ -1,3 +1,5 @@
+
+
 IF OBJECT_ID('core.Region', 'U') IS NULL
 BEGIN
     CREATE TABLE core.Region (

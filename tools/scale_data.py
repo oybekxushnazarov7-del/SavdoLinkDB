@@ -25,49 +25,48 @@ def generate_day(
     seed: int,
 ) -> List[dict]:
     """Bir kunlik cheklar va ulardagi sotuv qatorlarini generatsiya qiladi."""
-    # Bir xil seed orqali har safar qayta chaqirilganda bir xil natija olish (reproducibility)
     day_seed = seed + int(day.strftime("%Y%m%d"))
     random.seed(day_seed)
 
     rows = []
 
-    # Dam olish kunlarida (Shanba=5, Yakshanba=6) savdo hajmini oshirish
     is_weekend = day.weekday() in (5, 6)
     multiplier = 1.4 if is_weekend else 1.0
     actual_receipts = int(receipts_per_store * multiplier)
 
-    # Mahsulotlarga talab notekis bo'lishi uchun vaznlar (weights) belgilash
     weights = [1 / (i + 1) for i in range(len(products))]
 
     for store_code in stores:
         for receipt_idx in range(1, actual_receipts + 1):
             receipt_no = f"REC-{day.strftime('%Y%m%d')}-{store_code}-{receipt_idx:04d}"
-            
-            # Har bir chekda 1 tadan 5 tagacha turli mahsulot bo'lishi mumkin
+
             items_count = random.randint(1, 5)
             selected_products = random.choices(products, weights=weights, k=items_count)
 
-            # Kun davomidagi vaqtni tasodifiy tanlash (08:00 dan 22:00 gacha)
             random_seconds = random.randint(8 * 3600, 22 * 3600)
-            sale_time = (
-                timedelta(seconds=random_seconds)
-            )
-            sale_datetime_str = f"{day.strftime('%Y-%m-%d')} {str(sale_time)}"
+            sale_time = timedelta(seconds=random_seconds)
+            # Data Pack shartnomasi: YYYY-MM-DD HH:MM:SS
+            hours = random_seconds // 3600
+            mins = (random_seconds % 3600) // 60
+            secs = random_seconds % 60
+            sale_datetime_str = f"{day.strftime('%Y-%m-%d')} {hours:02d}:{mins:02d}:{secs:02d}"
 
             for prod in selected_products:
                 qty = random.randint(1, 4)
                 price = prod.get("price", 10000)
-                discount = random.choice([0, 0, 0, 500, 1000])
+                # D-04: discount foiz (0–100), summa emas
+                discount = random.choice([0, 0, 0, 5, 10, 15])
 
+                # D-03: CSV ustunlari Data Pack nomlari (_raw suffix YO'Q)
                 rows.append({
                     "receipt_no": receipt_no,
                     "store_code": store_code,
-                    "cashier_id": f"CASH-{random.randint(1, 10):02d}",
-                    "sale_datetime_raw": sale_datetime_str,
+                    "cashier_id": f"E-{random.randint(1, 10):04d}",
+                    "sale_datetime": sale_datetime_str,
                     "sku": prod.get("sku", "SKU-UNKNOWN"),
-                    "qty_raw": str(qty),
-                    "unit_price_raw": str(price),
-                    "discount_raw": str(discount),
+                    "qty": str(qty),
+                    "unit_price": str(price),
+                    "discount_pct": str(discount),
                     "payment_type": random.choice(["CARD", "CASH", "CARD"]),
                 })
 
@@ -77,17 +76,18 @@ def generate_day(
 def write_day(rows: List[dict], out_dir: Path, day: date) -> Path:
     """Generatsiya qilingan ma'lumotlarni kunlik CSV faylga yozadi."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    file_path = out_dir / f"sales_{day.strftime('%Y_%m_%d')}.csv"
+    # Data Pack: sales_YYYY-MM-DD.csv
+    file_path = out_dir / f"sales_{day.strftime('%Y-%m-%d')}.csv"
 
     fieldnames = [
         "receipt_no",
         "store_code",
         "cashier_id",
-        "sale_datetime_raw",
+        "sale_datetime",
         "sku",
-        "qty_raw",
-        "unit_price_raw",
-        "discount_raw",
+        "qty",
+        "unit_price",
+        "discount_pct",
         "payment_type",
     ]
 
@@ -116,7 +116,14 @@ def main():
         "--out", type=str, default="data/raw_scaled", help="Chiquvchi papka yo'li"
     )
     parser.add_argument(
-        "--ref-products", type=str, default="data/products.json", help="Mahsulotlar moslamasi fayli"
+        "--ref-products", type=str, default="data/incoming/products.json", help="Mahsulotlar moslamasi fayli"
+    )
+    # D-06: bugungi sana o'rniga qat'iy start-date — natija takrorlanadi
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        default="2026-01-01",
+        help="Boshlanish sanasi (YYYY-MM-DD)",
     )
 
     args = parser.parse_args()
@@ -124,23 +131,29 @@ def main():
     out_dir = Path(args.out)
     ref_path = Path(args.ref_products)
 
-    # Malumot va do'konlar bazasi shabloni
-    stores = ["STORE_01", "STORE_02", "STORE_03", "STORE_04", "STORE_05"]
-    
+    stores = ["ST-001", "ST-002", "ST-003", "ST-004", "ST-005"]
+
     if ref_path.exists():
         ref_data = load_reference(ref_path)
         products = ref_data if isinstance(ref_data, list) else ref_data.get("data", [])
+        # products.json da price_history — soddalashtirilgan price maydoni
+        normalized = []
+        for p in products:
+            price = p.get("price")
+            if price is None and p.get("price_history"):
+                price = p["price_history"][-1].get("price", 10000)
+            normalized.append({**p, "price": price or 10000})
+        products = normalized
     else:
-        # Baza fayli bo'lmagan holat uchun standart shablon mahsulotlar
         products = [
-            {"sku": f"SKU-{i:03d}", "price": random.choice([5000, 12000, 25000, 45000])}
+            {"sku": f"SKU-{i:05d}", "price": random.choice([5000, 12000, 25000, 45000])}
             for i in range(1, 51)
         ]
 
-    start_date = date.today() - timedelta(days=args.days)
+    start_date = date.fromisoformat(args.start_date)
     total_rows = 0
 
-    print(f"Generatsiya boshlandi... Seed: {args.seed}")
+    print(f"Generatsiya boshlandi... Seed: {args.seed}, start: {start_date}")
 
     for day_offset in range(args.days):
         current_day = start_date + timedelta(days=day_offset)

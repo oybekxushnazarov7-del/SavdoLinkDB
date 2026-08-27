@@ -1,3 +1,5 @@
+-- S-09: stg.RawProducts da ProductId/Category/UnitPrice yo'q.
+-- MERGE tabiiy kalit Sku bo'yicha; CategoryId/SupplierId JOIN orqali.
 CREATE OR ALTER PROCEDURE core.usp_LoadProducts
     @LoadId        NVARCHAR(50),
     @RowsInserted INT = 0 OUTPUT,
@@ -15,48 +17,46 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        -- Vaqtinchalik jadvalga xavfsiz tip o'girish orqali ma'lumot yig'ish
         SELECT DISTINCT
-            TRY_CONVERT(INT, ProductId) AS ProductId,
-            LTRIM(RTRIM(SKU)) AS SKU,
-            LTRIM(RTRIM(ProductName)) AS ProductName,
-            LTRIM(RTRIM(Category)) AS Category,
-            TRY_CONVERT(DECIMAL(12,2), REPLACE(UnitPrice, ',', '.')) AS UnitPrice
+            LTRIM(RTRIM(Sku))                        AS Sku,
+            LTRIM(RTRIM(ProductName))                AS ProductName,
+            LTRIM(RTRIM(CategoryCode))               AS CategoryCode,
+            LTRIM(RTRIM(SupplierInn))                AS SupplierInn,
+            LOWER(LTRIM(RTRIM(Unit)))                AS Unit,
+            LTRIM(RTRIM(Barcode))                    AS Barcode,
+            TRY_CONVERT(BIT, IsActive)               AS IsActive
         INTO #TempProducts
         FROM stg.RawProducts
-        WHERE LoadId = @LoadId AND ProductId IS NOT NULL;
+        WHERE LoadId = @LoadId
+          AND NULLIF(LTRIM(RTRIM(Sku)), '') IS NOT NULL;
 
-        -- Product Dimension 'ga MERGE qilish
         MERGE core.Product AS tgt
-        USING #TempProducts AS src
-            ON tgt.ProductId = src.ProductId
+        USING (
+            SELECT t.Sku, t.ProductName, c.CategoryId, s.SupplierId,
+                   t.Unit, t.Barcode, ISNULL(t.IsActive, 1) AS IsActive
+            FROM #TempProducts t
+            JOIN core.Category c ON c.CategoryCode = t.CategoryCode
+            JOIN core.Supplier s ON s.Inn          = t.SupplierInn
+        ) AS src
+            ON tgt.Sku = src.Sku
         WHEN MATCHED AND (
-            tgt.ProductName <> src.ProductName OR
-            tgt.Category <> src.Category OR
-            tgt.UnitPrice <> src.UnitPrice
+                tgt.ProductName <> src.ProductName
+             OR tgt.CategoryId  <> src.CategoryId
+             OR tgt.SupplierId  <> src.SupplierId
+             OR ISNULL(tgt.Barcode,'') <> ISNULL(src.Barcode,'')
+             OR tgt.IsActive <> src.IsActive
         ) THEN
-            UPDATE SET 
-                tgt.ProductName = src.ProductName,
-                tgt.Category = src.Category,
-                tgt.UnitPrice = src.UnitPrice
+            UPDATE SET tgt.ProductName = src.ProductName,
+                       tgt.CategoryId  = src.CategoryId,
+                       tgt.SupplierId  = src.SupplierId,
+                       tgt.Barcode     = src.Barcode,
+                       tgt.Unit        = src.Unit,
+                       tgt.IsActive    = src.IsActive
         WHEN NOT MATCHED BY TARGET THEN
-            INSERT (ProductId, SKU, ProductName, Category, UnitPrice)
-            VALUES (src.ProductId, src.SKU, src.ProductName, src.Category, src.UnitPrice)
+            INSERT (Sku, ProductName, CategoryId, SupplierId, Unit, Barcode, IsActive)
+            VALUES (src.Sku, src.ProductName, src.CategoryId, src.SupplierId,
+                    src.Unit, src.Barcode, src.IsActive)
         OUTPUT $action INTO @Changes;
-
-        -- LEAD() yordamida narxlar tarixining amal qilish muddatini (ValidTo) qayta hisoblash
-        WITH ProductHistoryCalculated AS (
-            SELECT 
-                HistoryId,
-                ValidFrom,
-                LEAD(ValidFrom) OVER (PARTITION BY ProductId ORDER BY ValidFrom) AS NewValidTo
-            FROM audit.ProductHistory
-        )
-        UPDATE ph
-        SET ph.ValidTo = phc.NewValidTo
-        FROM audit.ProductHistory ph
-        JOIN ProductHistoryCalculated phc ON ph.HistoryId = phc.HistoryId
-        WHERE ph.ValidTo IS NULL OR ph.ValidTo <> phc.NewValidTo;
 
         SELECT @RowsInserted = COUNT(*) FROM @Changes WHERE ChangeAction = 'INSERT';
         SELECT @RowsUpdated  = COUNT(*) FROM @Changes WHERE ChangeAction = 'UPDATE';

@@ -44,4 +44,5 @@ class Config():
             return {}
 
         return {k: Path(v) for k, v in raw_paths.items()}
+
     
