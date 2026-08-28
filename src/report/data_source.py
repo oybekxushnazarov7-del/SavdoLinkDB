@@ -3,32 +3,51 @@ Fayl: src/report/data_source.py
 Vazifasi: Bazadan hisobotlar uchun ma'lumotlarni tortib beradi.
 """
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
-def get_kpi_summary(cursor, date_from: str, date_to: str) -> dict:
-    """1. Boshqaruv paneli uchun umumiy KPI hisoboti."""
+
+def _period_totals(cursor, date_from: str, date_to: str) -> tuple[Decimal, int]:
+    """Berilgan davr uchun NetAmount va cheklar sonini qaytaradi."""
     query = """
-    SELECT 
-        ISNULL(SUM(NetSales), 0) AS NetSales,
+    SELECT
+        ISNULL(SUM(NetAmount), 0) AS NetAmount,
         ISNULL(SUM(ReceiptCount), 0) AS ReceiptCount
     FROM mart.FactDailySales
     WHERE SaleDate BETWEEN ? AND ?
     """
     cursor.execute(query, (date_from, date_to))
     row = cursor.fetchone()
-    
-    net_sales = Decimal(str(row[0])) if row and row[0] else Decimal("0.0")
-    receipts = int(row[1]) if row and row[1] else 0
+    net = Decimal(str(row[0])) if row and row[0] is not None else Decimal("0")
+    receipts = int(row[1]) if row and row[1] is not None else 0
+    return net, receipts
+
+
+def get_kpi_summary(cursor, date_from: str, date_to: str) -> dict:
+    """1. Boshqaruv paneli uchun umumiy KPI hisoboti."""
+    net_sales, receipts = _period_totals(cursor, date_from, date_to)
     avg_receipt = net_sales / receipts if receipts > 0 else Decimal("0.0")
+
+    # B-03: oldingi davr bilan taqqoslash
+    d1 = date.fromisoformat(date_from)
+    d2 = date.fromisoformat(date_to)
+    span = (d2 - d1).days + 1
+    prev_from = str(d1 - timedelta(days=span))
+    prev_to = str(d1 - timedelta(days=1))
+    prev_net, _ = _period_totals(cursor, prev_from, prev_to)
+
+    growth = None
+    if prev_net:
+        growth = float((net_sales - prev_net) / prev_net * 100)
 
     return {
         "net_amount": net_sales,
         "receipt_count": receipts,
         "avg_receipt": avg_receipt,
-        "growth_pct": 12.4,
+        "growth_pct": growth,
         "period_label": f"{date_from} — {date_to}",
-        "generated_at": datetime.now()
+        "generated_at": datetime.now(),
     }
+
 
 def get_top_products(cursor, date_from: str, date_to: str, limit: int = 10) -> list[dict]:
     """2. Top mahsulotlar va ularning ulushi."""
@@ -45,7 +64,7 @@ def get_top_products(cursor, date_from: str, date_to: str, limit: int = 10) -> l
     """
     cursor.execute(query, (date_from, date_to))
     rows = cursor.fetchall()
-    
+
     grand_total = sum([r[1] for r in rows if r[1]]) or 1
     results = []
     for row in rows:
@@ -53,18 +72,19 @@ def get_top_products(cursor, date_from: str, date_to: str, limit: int = 10) -> l
         results.append({
             "product_name": row[0],
             "total_sales": sales,
-            "share": float(round((sales / Decimal(str(grand_total))) * 100, 2))
+            "share": float(round((sales / Decimal(str(grand_total))) * 100, 2)),
         })
     return results
+
 
 def get_store_ranking(cursor, date_from: str, date_to: str) -> list[dict]:
     """3. Do'konlar reytingi."""
     query = """
-    SELECT 
+    SELECT
         s.StoreName,
         ISNULL(SUM(sd.LineAmount), 0) AS TotalSales
     FROM core.Store s
-    LEFT JOIN core.SalesHeader sh ON s.StoreId = sh.StoreId 
+    LEFT JOIN core.SalesHeader sh ON s.StoreId = sh.StoreId
         AND CAST(sh.SaleDateTime AS DATE) BETWEEN ? AND ?
     LEFT JOIN core.SalesDetail sd ON sh.SalesHeaderId = sd.SalesHeaderId
     GROUP BY s.StoreName
@@ -73,12 +93,13 @@ def get_store_ranking(cursor, date_from: str, date_to: str) -> list[dict]:
     cursor.execute(query, (date_from, date_to))
     return [{"store_name": r[0], "total_sales": Decimal(str(r[1]))} for r in cursor.fetchall()]
 
+
 def get_monthly_trend(cursor, year: int) -> list[dict]:
     """4. Oylik dinamika."""
     query = """
-    SELECT 
+    SELECT
         MONTH(SaleDate) AS MonthNo,
-        SUM(NetSales) AS MonthlySales
+        SUM(NetAmount) AS MonthlySales
     FROM mart.FactDailySales
     WHERE YEAR(SaleDate) = ?
     GROUP BY MONTH(SaleDate)
@@ -87,12 +108,13 @@ def get_monthly_trend(cursor, year: int) -> list[dict]:
     cursor.execute(query, (year,))
     return [{"month": r[0], "sales": Decimal(str(r[1]))} for r in cursor.fetchall()]
 
+
 def get_store_detail(cursor, store_code: str, date_from: str, date_to: str) -> dict:
     """5. Bitta do'kon kesimidagi batafsil hisobot."""
     query = """
-    SELECT 
+    SELECT
         s.StoreName,
-        ISNULL(SUM(m.NetSales), 0) AS TotalSales,
+        ISNULL(SUM(m.NetAmount), 0) AS TotalSales,
         ISNULL(SUM(m.ReceiptCount), 0) AS TotalReceipts
     FROM core.Store s
     LEFT JOIN mart.FactDailySales m ON s.StoreId = m.StoreId AND m.SaleDate BETWEEN ? AND ?
@@ -105,14 +127,15 @@ def get_store_detail(cursor, store_code: str, date_from: str, date_to: str) -> d
         return {"store_name": store_code, "total_sales": Decimal("0"), "total_receipts": 0}
     return {"store_name": row[0], "total_sales": Decimal(str(row[1])), "total_receipts": int(row[2])}
 
+
 def get_dq_metrics(cursor, load_id: str) -> dict:
     """6. Data Quality (DQ) ko'rsatkichlari."""
     query = """
-    SELECT 
-        TotalRows,
-        ValidRows,
-        InvalidRows,
-        Status
+    SELECT
+        ISNULL(SUM(RowsRead), 0),
+        ISNULL(SUM(RowsValid), 0),
+        ISNULL(SUM(RowsRejected), 0),
+        MAX(Status)
     FROM audit.LoadLog
     WHERE LoadId = ?
     """
@@ -120,19 +143,25 @@ def get_dq_metrics(cursor, load_id: str) -> dict:
     row = cursor.fetchone()
     if not row:
         return {"total_rows": 0, "valid_rows": 0, "invalid_rows": 0, "status": "UNKNOWN"}
-    return {"total_rows": row[0], "valid_rows": row[1], "invalid_rows": row[2], "status": row[3]}
+    return {
+        "total_rows": int(row[0]),
+        "valid_rows": int(row[1]),
+        "invalid_rows": int(row[2]),
+        "status": row[3] or "UNKNOWN",
+    }
+
 
 def get_load_history(cursor, limit: int = 30) -> list[dict]:
     """7. Oxirgi yuklashlar jurnali."""
     query = f"""
     SELECT TOP ({limit})
         LoadId,
-        LoadedAt,
-        FileName,
-        TotalRows,
+        StartedAt,
+        SourceFile,
+        RowsRead,
         Status
     FROM audit.LoadLog
-    ORDER BY LoadedAt DESC
+    ORDER BY StartedAt DESC
     """
     cursor.execute(query)
     return [
@@ -141,7 +170,7 @@ def get_load_history(cursor, limit: int = 30) -> list[dict]:
             "loaded_at": r[1],
             "file_name": r[2],
             "total_rows": r[3],
-            "status": r[4]
+            "status": r[4],
         }
         for r in cursor.fetchall()
     ]

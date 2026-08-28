@@ -6,14 +6,11 @@ from pathlib import Path
 from src.pipeline import ETLPipeline
 from src.validate.validator import Validator
 from src.config import load_settings, Config
-from src.validate.rules import DEFAULT_RULES
 from src.load.db import DatabaseConnection
 from src.report.builder import ReportBuilder
+from src.utils.logger import get_logger
+from src.utils.helpers import make_load_id
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger("SavdoLink")
 
 
@@ -22,12 +19,17 @@ def build_parser() -> argparse.ArgumentParser:
         prog="savdolink",
         description="SavdoLink ETL Pipeline — Ma'lumotlarni qayta ishlash va yuklash tizimi",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Batafsil log (DEBUG)",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run", help="ETL jarayonini ishga tushiradi")
     run_parser.add_argument(
         "--stage",
-        choices=["all", "extract", "transform", "load"],
+        choices=["all", "extract", "transform", "load", "core", "mart"],
         default="all",
         help="Bajariladigan ETL bosqichi (default: all)",
     )
@@ -42,8 +44,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bazaga saqlamasdan sinov rejimida ishga tushirish (Rollback)",
     )
+    run_parser.add_argument(
+        "--load-id",
+        type=str,
+        default=None,
+        help="core/mart bosqichi uchun LoadId (masalan LOAD-20260828-120000)",
+    )
+    run_parser.add_argument(
+        "--month",
+        type=str,
+        default=None,
+        help="mart bosqichi uchun davr: YYYY-MM",
+    )
 
-    # Qadam 8: report CLI
     report_parser = subparsers.add_parser("report", help="HTML hisobot yasaydi")
     report_parser.add_argument(
         "--type",
@@ -75,28 +88,46 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    # P-02: pathlib — Windows `\` f-string escape ogohlantirishisiz
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
     base_dir = Path(__file__).resolve().parent
     load_data = load_settings(path=str(base_dir / "config" / "settings.json"))
     config = Config(load_data)
 
     if args.command == "run":
-        logger.info(
+        rules_path = base_dir / "config" / "validation_rules.json"
+        validator = Validator.from_config(str(rules_path))
+
+        run_load_id = args.load_id or make_load_id()
+        # B-13: fayl va konsolga log
+        run_logger = get_logger("SavdoLink", run_load_id)
+        run_logger.info(
             "ETL Pipeline ishga tushmoqda... (Stage: %s, Dry-run: %s)",
             args.stage,
             args.dry_run,
         )
-        # P-04: Validator(DEFAULT_RULES); P-08: extractor main da yaratilmaydi
-        validator = Validator(DEFAULT_RULES)
+
+        month = args.month or "2026-02"
+        date_from, date_to = _month_range(month)
+
         pipeline = ETLPipeline(config, validator=validator)
-        stats = pipeline.run(stage=args.stage, file_path=args.file, dry_run=args.dry_run)
-        logger.info("ETL yakunlandi. Statistika: %s", stats)
+        stats = pipeline.run(
+            stage=args.stage,
+            file_path=args.file,
+            dry_run=args.dry_run,
+            load_id=run_load_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        run_logger.info("ETL yakunlandi. Statistika: %s", stats)
 
     elif args.command == "report":
         month = args.month or "2026-02"
         date_from, date_to = _month_range(month)
         db_cfg = config.get("db", {})
-        # ReportBuilder cfg.paths kutadi — butun settings lug'ati
         with DatabaseConnection(db_cfg) as conn:
             builder = ReportBuilder(load_data, conn.cursor)
             if args.type == "dashboard":

@@ -9,10 +9,9 @@
     "incoming": "data/incoming",
     "archive":  "data/archive",
     "rejected": "data/rejected",
-    "raw": "data/raw_scaled",
     "logs":     "logs",
     "reports":  "reports"
   },
-  "load": { "batch_size": 1000, "encoding": "utf-8" },
+  "load": { "batch_size": 1000, "encoding": "utf-8", "stg_retention_days": 7 },
   "quality": { "max_reject_pct": 15.0 }
 }

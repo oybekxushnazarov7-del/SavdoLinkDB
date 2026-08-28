@@ -4,6 +4,8 @@
   <div class="kpi-value">{{ value }}</div>
   {% if delta is not none %}
   <div class="kpi-delta {{ delta | delta_class }}">{{ delta | percent }}</div>
+  {% elif delta is none and title == "Umumiy Savdo" %}
+  <div class="kpi-delta muted">taqqoslash uchun ma'lumot yo'q</div>
   {% endif %}
 </div>
 {% endmacro %}

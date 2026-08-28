@@ -15,7 +15,7 @@ Avtomatlashtirilgan profilaktika uchun tools/profile_data.py skripti yozildi ham
 Sprint 3: DDL va Staging Arxitekturasi
 MS SQL Server'da loyiha uchun kerakli sxemalar (stg, core, mart, audit) yaratildi.
 
-Xom ma'lumotlarni qabul qiluvchi Staging jadvallari (stg.RawSales, stg.RawProducts, stg.RawStores, stg.RawCashiers) loyihalashtirildi.
+Xom ma'lumotlarni qabul qiluvchi Staging jadvallari (stg.RawSales, stg.RawProducts, stg.RawStores, stg.RawEmployees) loyihalashtirildi.
 
 Ma'lumotlar ombori uchun normalize qilingan Core jadvallari (core.Store, core.Product, core.SalesHeader, core.SalesDetail, core.Returns) va xatoliklarni qayd etuvchi audit.ErrorLog hamda audit.ProductHistory jadvallari qurildi.
 

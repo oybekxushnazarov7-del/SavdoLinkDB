@@ -1,6 +1,9 @@
 import functools
+import logging
 import time
 from typing import Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class Timer:
@@ -17,8 +20,8 @@ class Timer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.end_time = time.perf_counter()
-        print(
-            f"[{self.label}] bajarilish vaqti: {self.elapsed:.4f} soniya"
+        logger.info(
+            "[%s] bajarilish vaqti: %.4f soniya", self.label, self.elapsed
         )
 
     @property

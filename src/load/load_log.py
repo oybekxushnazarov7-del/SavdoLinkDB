@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Dict
 
+from src.exceptions import LoadError
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,18 +21,18 @@ class LoadLogger:
 
     def start(self, load_id: str, source_file: str) -> int:
         """Yuklashni RUNNING holatida boshlab, LogID qaytaradi."""
-        insert_query = """
+        # B-01: OUTPUT INSERTED — SCOPE_IDENTITY alohida batch'da NULL qaytaradi
+        query = """
             INSERT INTO audit.LoadLog (LoadId, SourceFile, Status, StartedAt)
+            OUTPUT INSERTED.LoadLogId
             VALUES (?, ?, 'RUNNING', SYSDATETIME())
         """
-        self.cursor.execute(insert_query, (load_id, source_file))
-
-        # P-10: @@IDENTITY o'rniga SCOPE_IDENTITY — trigger boshqa IDENTITY bersa chalkashmasin.
-        self.cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+        self.cursor.execute(query, (load_id, source_file))
         row = self.cursor.fetchone()
-        log_id = int(row[0]) if row and row[0] is not None else 1
-
-        logger.info(f"Load boshlandi [LogID: {log_id}, Fayl: {source_file}]")
+        if row is None or row[0] is None:
+            raise LoadError("LoadLogId olinmadi — audit.LoadLog yozuvi yaratilmadi")
+        log_id = int(row[0])
+        logger.info("Load boshlandi [LogID: %s, Fayl: %s]", log_id, source_file)
         return log_id
 
     def finish(self, log_id: int, stats: Dict[str, int], status: str = "SUCCESS") -> None:
@@ -53,11 +55,11 @@ class LoadLogger:
                 stats.get("rows_read", 0),
                 stats.get("rows_valid", 0),
                 stats.get("rows_rejected", 0),
-                stats.get("rows_loaded", 0),
+                stats.get("rows_loaded", stats.get("db_rows_written", 0)),
                 log_id,
             ),
         )
-        logger.info(f"Load yakunlandi [LogID: {log_id}, Status: {status}]")
+        logger.info("Load yakunlandi [LogID: %s, Status: %s]", log_id, status)
 
     def fail(self, log_id: int, message: str) -> None:
         """Jarayonni FAILED holatiga o'tkazadi."""
@@ -71,4 +73,4 @@ class LoadLogger:
             WHERE LoadLogId = ?;
         """
         self.cursor.execute(query, (message[:1000] if message else "Error", log_id))
-        logger.error(f"Load muvaffaqiyatsiz [LogID: {log_id}]: {message}")
+        logger.error("Load muvaffaqiyatsiz [LogID: %s]: %s", log_id, message)

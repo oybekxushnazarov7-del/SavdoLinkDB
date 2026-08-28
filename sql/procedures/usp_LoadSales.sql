@@ -15,6 +15,26 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+        -- B-07: yetim havolalarni sanash va jurnalga yozish
+        DECLARE @Orphans INT;
+
+        SELECT @Orphans = COUNT(*)
+        FROM stg.RawSales rs
+        LEFT JOIN core.Store    st ON st.StoreCode = LTRIM(RTRIM(rs.StoreCode))
+        LEFT JOIN core.Employee e  ON e.EmpCode    = LTRIM(RTRIM(rs.CashierId))
+        LEFT JOIN core.Product  p  ON p.Sku        = LTRIM(RTRIM(rs.Sku))
+        WHERE rs.LoadId = @LoadId
+          AND NULLIF(LTRIM(RTRIM(rs.ReceiptNo)), '') IS NOT NULL
+          AND (st.StoreId IS NULL OR e.EmployeeId IS NULL OR p.ProductId IS NULL);
+
+        IF @Orphans > 0
+            INSERT INTO audit.ErrorLog (LoadId, ErrorNumber, ErrorMessage, ErrorProcedure)
+            VALUES (
+                @LoadId, 0,
+                CONCAT(N'Yetim havolali qatorlar core ga yuklanmadi: ', @Orphans),
+                N'core.usp_LoadSales'
+            );
+
         SELECT
             LTRIM(RTRIM(rs.ReceiptNo)) AS ReceiptNo,
             st.StoreId,
@@ -50,21 +70,34 @@ BEGIN
 
         SET @HeadersLoaded = @@ROWCOUNT;
 
+        -- B-08: faqat o'zgarganda yangilash + manbada takrorlanishni bartaraf etish
         MERGE core.SalesDetail AS tgt
         USING (
-            SELECT
-                sh.SalesHeaderId,
-                ts.ProductId,
-                ts.Qty,
-                ts.UnitPrice,
-                ts.DiscountPct
-            FROM #TempSales ts
-            JOIN core.SalesHeader sh
-                ON sh.ReceiptNo = ts.ReceiptNo AND sh.StoreId = ts.StoreId
-            WHERE ts.Qty IS NOT NULL AND ts.UnitPrice IS NOT NULL
+            SELECT SalesHeaderId, ProductId, Qty, UnitPrice, DiscountPct
+            FROM (
+                SELECT
+                    sh.SalesHeaderId,
+                    ts.ProductId,
+                    ts.Qty,
+                    ts.UnitPrice,
+                    ts.DiscountPct,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY sh.SalesHeaderId, ts.ProductId
+                        ORDER BY ts.UnitPrice DESC
+                    ) AS rn
+                FROM #TempSales ts
+                JOIN core.SalesHeader sh
+                    ON sh.ReceiptNo = ts.ReceiptNo AND sh.StoreId = ts.StoreId
+                WHERE ts.Qty IS NOT NULL AND ts.UnitPrice IS NOT NULL
+            ) x
+            WHERE rn = 1
         ) AS src
             ON tgt.SalesHeaderId = src.SalesHeaderId AND tgt.ProductId = src.ProductId
-        WHEN MATCHED THEN
+        WHEN MATCHED AND (
+                tgt.Qty         <> src.Qty
+             OR tgt.UnitPrice   <> src.UnitPrice
+             OR tgt.DiscountPct <> src.DiscountPct
+        ) THEN
             UPDATE SET
                 tgt.Qty = src.Qty,
                 tgt.UnitPrice = src.UnitPrice,

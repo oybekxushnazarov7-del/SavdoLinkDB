@@ -15,8 +15,8 @@ def test_pipeline_dry_run_rollback(mock_db_cls, tmp_path):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_conn.cursor = mock_cursor
-    # Idempotentlik: hali yuklanmagan
-    mock_cursor.fetchone.return_value = None
+    # Idempotentlik: hali yuklanmagan; keyin OUTPUT INSERTED.LoadLogId
+    mock_cursor.fetchone.side_effect = [None, (1,)]
     mock_db_cls.return_value.__enter__.return_value = mock_conn
 
     # Bo'sh incoming — fayl yo'q, lekin dry-run rollback chaqirilishi kerak emas

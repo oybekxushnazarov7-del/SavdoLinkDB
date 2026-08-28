@@ -3,6 +3,8 @@ R-09: haqiqiy LoadLogger kodini sinaydi (mock list bilan «test teatri» emas).
 """
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.load.load_log import LoadLogger
 
 
@@ -41,3 +43,24 @@ def test_fail_uses_message_column():
     sql = cur.execute.call_args[0][0]
     assert "Message" in sql
     assert "ErrorMessage" not in sql
+
+
+def test_start_returns_output_inserted_id():
+    # B-01: OUTPUT INSERTED.LoadLogId — zaxira else 1 yo'q
+    cur = MagicMock()
+    cur.fetchone.return_value = (42,)
+    log = LoadLogger(cur)
+    log_id = log.start("LOAD-TEST", "sales.csv")
+    assert log_id == 42
+    sql = cur.execute.call_args[0][0]
+    assert "OUTPUT INSERTED.LoadLogId" in sql
+
+
+def test_start_raises_when_no_id():
+    from src.exceptions import LoadError
+
+    cur = MagicMock()
+    cur.fetchone.return_value = None
+    log = LoadLogger(cur)
+    with pytest.raises(LoadError):
+        log.start("LOAD-TEST", "sales.csv")

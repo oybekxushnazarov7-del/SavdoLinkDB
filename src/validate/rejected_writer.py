@@ -1,9 +1,20 @@
 import csv
 import json
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional, Union
 
 from src.validate.validator import ValidationResult
+
+
+def _json_default(obj):
+    """json.dumps tushunmaydigan tiplarni matnga aylantiradi."""
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return str(obj)
+    return str(obj)
 
 
 class RejectedWriter:
@@ -59,10 +70,12 @@ class RejectedWriter:
             return
 
         # Yozuvdagi asl ma'lumotni saqlash (dict bo'lsa JSON string shaklida)
+        record = result.record
+        raw = record.get("_raw", record) if isinstance(record, dict) else record
         raw_row_str = (
-            json.dumps(result.record, ensure_ascii=False)
-            if isinstance(result.record, dict)
-            else str(result.record)
+            json.dumps(raw, ensure_ascii=False, default=_json_default)
+            if isinstance(raw, dict)
+            else str(raw)
         )
 
         # Bitta qatorda bir nechta ERROR bo'lishi mumkin: har biri uchun alohida yozuv tushiriladi

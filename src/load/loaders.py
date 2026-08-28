@@ -108,7 +108,7 @@ class BulkLoader:
         """Buferni DB ga yozib tozalaydi."""
         if not self.buffer:
             return 0
-        print(f"[DEBUG] SQL: {self.sql}")
+        logger.debug("SQL: %s", self.sql)
         self.cursor.executemany(self.sql, self.buffer)
         written = len(self.buffer)
         self._total_loaded += written

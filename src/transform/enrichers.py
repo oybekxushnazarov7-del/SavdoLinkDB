@@ -64,6 +64,7 @@ def enrich_sale(
         enriched_record["in_catalog"] = True
         if enriched_record.get("unit_price") is None and catalog_price is not None:
             enriched_record["unit_price"] = catalog_price
+            enriched_record["_price_source"] = "catalog"
     else:
         enriched_record["in_catalog"] = False
 
