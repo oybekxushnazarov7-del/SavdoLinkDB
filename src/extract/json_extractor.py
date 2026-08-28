@@ -8,7 +8,7 @@ class JsonExtractor(BaseExtractor):
 
     def read(self) -> Generator[Dict[str, Any], None, None]:
         """JSON fayldagi asosiy massiv elementlarini birma-bir qaytaradi."""
-        with open(self.path, encoding=self.encoding) as f:
+        with open(self.path, encoding="utf-8-sig") as f:
             data = json.load(f)
 
             # Agar JSON obyektlar ro'yxati (list) bo'lsa
@@ -27,7 +27,7 @@ class JsonExtractor(BaseExtractor):
         Masalan: {sku: "SKU-001", price_history: [{...}, {...}]} obyektdan
         har bir narx tarixi uchun alohida yozuv hosil qiladi.
         """
-        with open(self.path, encoding=self.encoding) as f:
+        with open(self.path, encoding="utf-8-sig") as f:
             data = json.load(f)
 
             if isinstance(data, list):

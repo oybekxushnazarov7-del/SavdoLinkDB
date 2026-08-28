@@ -1,6 +1,7 @@
 from pathlib import Path
 import logging
 from typing import Any, Dict, List, Optional
+import json
 
 from src.config import Config
 from src.extract.factory import get_extractor
@@ -17,6 +18,7 @@ from src.transform.enrichers import PriceCatalog, enrich_sale
 from src.models.sale import SaleRecord
 from src.validate.rules import DEFAULT_RULES
 from src.utils.helpers import make_load_id, archive_file
+from src.exceptions import ExtractError
 
 logger = logging.getLogger("SavdoLink.Pipeline")
 
@@ -140,6 +142,7 @@ class ETLPipeline:
             "rows_rejected": 0,
             "db_rows_written": 0,
             "rows_duplicate": 0,
+            "files_failed": 0,
         }
         all_valid_sales: List[dict] = []
 
@@ -308,7 +311,15 @@ class ETLPipeline:
                         for k in ("rows_read", "rows_valid", "rows_rejected", "db_rows_written"):
                             stats[k] += file_stats[k]
 
+                    except (ExtractError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+                        # KUTILGAN xato: fayl buzuq. Qayd etamiz va KEYINGISIGA o'tamiz.
+                        load_logger.fail(log_id, f"Fayl o'qilmadi: {exc}")
+                        stats["files_failed"] = stats.get("files_failed", 0) + 1
+                        logger.error("Fayl o'tkazib yuborildi: %s — %s", current_file.name, exc)
+                        continue
+
                     except Exception as exc:
+                        # KUTILMAGAN xato: kod nosozligi. Tizimni to'xtatamiz.
                         load_logger.fail(log_id, str(exc))
                         raise
 
@@ -354,6 +365,9 @@ class ETLPipeline:
             )
             logger.info("DQ: %s", dq["metrics"])
             logger.info("Qoidalar statistikasi: %s", self.validator.stats)
+
+        if stats["files_failed"]:
+            logger.warning("DIQQAT: %s ta fayl qayta ishlanmadi", stats["files_failed"])
 
         logger.info("Yakun: %s", stats)
         return stats

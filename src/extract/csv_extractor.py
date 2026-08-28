@@ -6,7 +6,7 @@ from src.extract.base_extractor import BaseExtractor
 class CsvExtractor(BaseExtractor):
     """CSV fayllardan ma'lumotlarni qatorma-qator o'quvchi extractor."""
 
-    def __init__(self, path: str, delimiter: str = ";", encoding: str = "utf-8"):
+    def __init__(self, path: str, delimiter: str = ";", encoding: str = "utf-8-sig"):
         super().__init__(path, encoding)
         self.delimiter = delimiter
 

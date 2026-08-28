@@ -9,7 +9,7 @@ class BaseExtractor(ABC):
     Umumiy tekshiruvlar shu yerda. Voris sinflar faqat read() ni yozadi.
     """
 
-    def __init__(self, path, encoding="utf-8"):
+    def __init__(self, path, encoding="utf-8-sig"):
         self.path = Path(path)
         self.encoding = encoding
         
