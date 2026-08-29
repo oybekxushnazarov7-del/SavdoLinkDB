@@ -154,6 +154,7 @@ class StagingLoader:
             "LoadId", "SourceFile", "RowNum",
             "ReceiptNo", "StoreCode", "CashierId", "SaleDateTime",
             "Sku", "Qty", "UnitPrice", "DiscountPct", "PaymentType",
+            "UnitPriceResolved", "PriceSource",
         ]
         loader = BulkLoader(
             self.cursor, "stg.RawSales", columns, batch_size=self._batch_size()
@@ -173,6 +174,8 @@ class StagingLoader:
                 raw.get("unit_price"),
                 raw.get("discount_pct"),
                 raw.get("payment_type"),
+                str(rec.get("unit_price")) if rec.get("unit_price") is not None else None,
+                rec.get("_price_source", "file"),
             ))
         return loader.close()
 

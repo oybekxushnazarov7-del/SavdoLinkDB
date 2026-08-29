@@ -17,7 +17,7 @@ from src.transform.deduplicator import deduplicate
 from src.transform.enrichers import PriceCatalog, enrich_sale
 from src.models.sale import SaleRecord
 from src.validate.rules import DEFAULT_RULES
-from src.utils.helpers import make_load_id, archive_file
+from src.utils.helpers import make_load_id, archive_file, full_sales_date_range
 from src.exceptions import ExtractError
 
 logger = logging.getLogger("SavdoLink.Pipeline")
@@ -107,8 +107,13 @@ class ETLPipeline:
             "core.usp_LoadDimensions",
             "core.usp_LoadProducts",
             "core.usp_LoadSales",
-            "core.usp_LoadReturns",
         ]
+        cur.execute(
+            "SELECT COUNT(*) FROM stg.RawReturns WHERE LoadId = ?",
+            (load_id,),
+        )
+        if cur.fetchone()[0] > 0:
+            procedures.append("core.usp_LoadReturns")
         for proc in procedures:
             cur.execute(f"EXEC {proc} @LoadId = ?", (load_id,))
             logger.info("%s bajarildi [LoadId=%s]", proc, load_id)
@@ -368,6 +373,14 @@ class ETLPipeline:
 
         if stats["files_failed"]:
             logger.warning("DIQQAT: %s ta fayl qayta ishlanmadi", stats["files_failed"])
+
+        if stage == "all" and not dry_run:
+            with DatabaseConnection(db_config) as conn:
+                self.promote_to_core(conn, load_id)
+                mart_from, mart_to = date_from, date_to
+                if not mart_from or not mart_to:
+                    mart_from, mart_to = full_sales_date_range(conn.cursor)
+                self.promote_to_mart(conn, mart_from, mart_to)
 
         logger.info("Yakun: %s", stats)
         return stats

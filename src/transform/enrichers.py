@@ -68,6 +68,9 @@ def enrich_sale(
     else:
         enriched_record["in_catalog"] = False
 
+    if enriched_record.get("unit_price") is not None and "_price_source" not in enriched_record:
+        enriched_record["_price_source"] = "file"
+
     store_code = record.get("store_code") or record.get("store_id")
     if store_code and store_code in stores:
         store_info = stores[store_code]

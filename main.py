@@ -9,7 +9,7 @@ from src.config import load_settings, Config
 from src.load.db import DatabaseConnection
 from src.report.builder import ReportBuilder
 from src.utils.logger import get_logger
-from src.utils.helpers import make_load_id
+from src.utils.helpers import make_load_id, full_sales_date_range
 
 logger = logging.getLogger("SavdoLink")
 
@@ -84,6 +84,26 @@ def _month_range(month: str):
     return f"{year:04d}-{mon:02d}-01", f"{year:04d}-{mon:02d}-{last:02d}"
 
 
+def get_latest_successful_load_id(config: Config) -> str:
+    """audit.LoadLog jadvalidan oxirgi SUCCESS statusli LoadId ni qaytaradi."""
+    db_cfg = config.get("db", {})
+    with DatabaseConnection(db_cfg) as conn:
+        cursor = conn.cursor
+        cursor.execute("""
+            SELECT TOP 1 LoadId 
+            FROM audit.LoadLog
+            WHERE Status = 'SUCCESS' 
+            ORDER BY LoadLogId DESC
+        """)
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            raise ValueError(
+                "audit.LoadLog da muvaffaqiyatli yuklash (SUCCESS) topilmadi. "
+                "Avval `--stage all` yoki `--stage load` ni bajarib oling."
+            )
+        return row[0]
+
+
 def main():
     parser = build_parser()
     args = parser.parse_args()
@@ -101,7 +121,15 @@ def main():
         rules_path = base_dir / "config" / "validation_rules.json"
         validator = Validator.from_config(str(rules_path))
 
-        run_load_id = args.load_id or make_load_id()
+        # LoadId ni aniqlash logikasi
+        if args.load_id:
+            run_load_id = args.load_id
+        elif args.stage in ["core", "mart"]:
+            run_load_id = get_latest_successful_load_id(config)
+            logger.info("Alohida stage uchun bazadan oxirgi LoadId olindi: %s", run_load_id)
+        else:
+            run_load_id = make_load_id()
+
         # B-13: fayl va konsolga log
         run_logger = get_logger("SavdoLink", run_load_id)
         run_logger.info(
@@ -110,8 +138,13 @@ def main():
             args.dry_run,
         )
 
-        month = args.month or "2026-02"
-        date_from, date_to = _month_range(month)
+        date_from, date_to = None, None
+        if args.month:
+            date_from, date_to = _month_range(args.month)
+        elif args.stage == "mart":
+            db_cfg = config.get("db", {})
+            with DatabaseConnection(db_cfg) as conn:
+                date_from, date_to = full_sales_date_range(conn.cursor)
 
         pipeline = ETLPipeline(config, validator=validator)
         stats = pipeline.run(
@@ -125,10 +158,12 @@ def main():
         run_logger.info("ETL yakunlandi. Statistika: %s", stats)
 
     elif args.command == "report":
-        month = args.month or "2026-02"
-        date_from, date_to = _month_range(month)
         db_cfg = config.get("db", {})
         with DatabaseConnection(db_cfg) as conn:
+            if args.month:
+                date_from, date_to = _month_range(args.month)
+            else:
+                date_from, date_to = full_sales_date_range(conn.cursor)
             builder = ReportBuilder(load_data, conn.cursor)
             if args.type == "dashboard":
                 out = builder.build_dashboard(date_from, date_to)

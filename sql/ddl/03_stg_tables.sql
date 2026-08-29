@@ -17,6 +17,8 @@ Begin
         UnitPrice     NVARCHAR(200) NULL,
         DiscountPct   NVARCHAR(200) NULL,
         PaymentType   NVARCHAR(200) NULL,
+        UnitPriceResolved NVARCHAR(200) NULL,
+        PriceSource       NVARCHAR(20)  NULL,
 
         CONSTRAINT PK_RawSales PRIMARY KEY CLUSTERED (RawSalesId)
     );
@@ -175,3 +177,9 @@ Begin
         CONSTRAINT PK_RawRates PRIMARY KEY CLUSTERED (RawRateId)
     );
 END
+
+-- Migratsiya: mavjud bazalarga tiklangan narx ustunlari
+IF COL_LENGTH('stg.RawSales', 'UnitPriceResolved') IS NULL
+    ALTER TABLE stg.RawSales ADD UnitPriceResolved NVARCHAR(200) NULL;
+IF COL_LENGTH('stg.RawSales', 'PriceSource') IS NULL
+    ALTER TABLE stg.RawSales ADD PriceSource NVARCHAR(20) NULL;

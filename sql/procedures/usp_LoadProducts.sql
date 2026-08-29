@@ -12,6 +12,11 @@ BEGIN
     IF @LoadId IS NULL OR LTRIM(RTRIM(@LoadId)) = ''
         THROW 50001, 'LoadId ko''rsatilmagan', 1;
 
+    DECLARE @StgRows INT = (SELECT COUNT(*) FROM stg.RawProducts WHERE LoadId = @LoadId);
+
+    IF @StgRows = 0
+        THROW 50010, 'Bu LoadId uchun stg.RawProducts da qator yo''q. LoadId to''g''rimi?', 1;
+
     DECLARE @Changes TABLE (ChangeAction NVARCHAR(10));
 
     BEGIN TRY

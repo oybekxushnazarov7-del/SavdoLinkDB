@@ -1,7 +1,9 @@
 from datetime import datetime
 from pathlib import Path
 import shutil
-from typing import List, Union
+from typing import List, Tuple, Union
+
+from src.exceptions import LoadError
 
 
 def list_incoming(path: Path, pattern: str = "*") -> List[Path]:
@@ -31,6 +33,18 @@ def archive_file(src: Path, dst_dir: Path) -> Path:
 
     # Faylni yangi manzilga ko'chirish
     return Path(shutil.move(str(src_path), str(dst_path)))
+
+
+def full_sales_date_range(cursor) -> Tuple[str, str]:
+    """core.SalesHeader dagi eng erta va eng kech savdo sanasini qaytaradi."""
+    cursor.execute("""
+        SELECT CAST(MIN(SaleDateTime) AS DATE), CAST(MAX(SaleDateTime) AS DATE)
+        FROM core.SalesHeader
+    """)
+    row = cursor.fetchone()
+    if not row or row[0] is None:
+        raise LoadError("core.SalesHeader bo'sh — avval --stage core ni bajaring")
+    return str(row[0]), str(row[1])
 
 
 def make_load_id() -> str:
