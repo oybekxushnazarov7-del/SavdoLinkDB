@@ -164,6 +164,35 @@ class SkuExistsRule(ValidationRule):
         return record.get("catalog_price") is not None or record.get("in_catalog") is True
 
 
+class StoreExistsRule(ValidationRule):
+    """Do'kon kodi spravochnikda bormi."""
+    code = "STORE_EXISTS"
+    message = "Do'kon kodi mavjud emas"
+    severity = "ERROR"
+
+    def __init__(self, known_stores=None):
+        self.known_stores = known_stores or set()
+
+    def check(self, record: dict) -> bool:
+        if not self.known_stores:
+            return True
+        return (record.get("store_code") or "").strip().upper() in self.known_stores
+
+
+class FutureDateRule(ValidationRule):
+    """Savdo sanasi kelajakda bo'lmasligi kerak."""
+    code = "FUTURE_DATE"
+    message = "Savdo sanasi kelajakda"
+    severity = "ERROR"
+
+    def check(self, record: dict) -> bool:
+        dt = record.get("sale_datetime")
+        if dt is None:
+            return True
+        value = dt.date() if hasattr(dt, "date") else dt
+        return value <= date.today()
+
+
 # ==============================================================================
 # 6. BIZNES QOIDALARI (Business logic / Anomalies checks)
 # ==============================================================================

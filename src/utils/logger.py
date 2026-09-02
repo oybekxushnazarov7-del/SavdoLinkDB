@@ -7,11 +7,12 @@ def get_logger(name: str, load_id: str) -> logging.Logger:
     """Fayl va konsolga belgilangan formatda log yozuvchi logger qaytaradi."""
     logger = logging.getLogger(name)
 
-    # Takroriy handler'lar qo'shilishining oldini olish
-    if logger.hasHandlers():
+    # Takroriy handler'lar qo'shilishining oldini olish (faqat o'z handlerlari)
+    if logger.handlers:
         return logger
 
     logger.setLevel(logging.INFO)
+    logger.propagate = False
 
     # Log formati: 2026-08-10 14:22:31 | INFO | extract.csv | LOAD-20260810-142230 | 1042 qator o'qildi
     log_format = logging.Formatter(

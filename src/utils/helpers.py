@@ -43,7 +43,13 @@ def full_sales_date_range(cursor) -> Tuple[str, str]:
     """)
     row = cursor.fetchone()
     if not row or row[0] is None:
-        raise LoadError("core.SalesHeader bo'sh — avval --stage core ni bajaring")
+        raise LoadError(
+            "core.SalesHeader bo'sh. Mumkin bo'lgan sabablar: "
+            "(1) stg da bu LoadId uchun savdo qatori yo'q; "
+            "(2) barcha qatorlar yetim havola tufayli tushib qolgan — "
+            "audit.ErrorLog ni tekshiring; "
+            "(3) usp_LoadSales chaqirilmagan."
+        )
     return str(row[0]), str(row[1])
 
 

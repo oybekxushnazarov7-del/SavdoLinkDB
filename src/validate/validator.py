@@ -14,6 +14,8 @@ from src.validate.rules import (
     PriceDeviationRule,
     CashierStoreRule,
     SkuExistsRule,
+    StoreExistsRule,
+    FutureDateRule,
     ReturnAfterSaleRule,
 )
 
@@ -29,6 +31,8 @@ RULE_REGISTRY = {
     "PRICE_DEVIATION": PriceDeviationRule,
     "CASHIER_STORE": CashierStoreRule,
     "SKU_EXISTS": SkuExistsRule,
+    "STORE_EXISTS": StoreExistsRule,
+    "FUTURE_DATE": FutureDateRule,
     "RETURN_AFTER_SALE": ReturnAfterSaleRule,
 }
 

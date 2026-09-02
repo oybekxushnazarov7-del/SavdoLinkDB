@@ -16,11 +16,21 @@ from src.transform.cleaners import clean_row, normalize_code, normalize_text, em
 from src.transform.deduplicator import deduplicate
 from src.transform.enrichers import PriceCatalog, enrich_sale
 from src.models.sale import SaleRecord
-from src.validate.rules import DEFAULT_RULES
+from src.validate.rules import DEFAULT_RULES, StoreExistsRule
 from src.utils.helpers import make_load_id, archive_file, full_sales_date_range
 from src.exceptions import ExtractError
 
 logger = logging.getLogger("SavdoLink.Pipeline")
+
+PROC_SOURCES = [
+    (
+        "core.usp_LoadDimensions",
+        ("stg.RawStores", "stg.RawEmployees", "stg.RawCategories", "stg.RawSuppliers"),
+    ),
+    ("core.usp_LoadProducts", ("stg.RawProducts",)),
+    ("core.usp_LoadSales", ("stg.RawSales",)),
+    ("core.usp_LoadReturns", ("stg.RawReturns",)),
+]
 
 SALES_SPEC = {
     "sku": normalize_code,
@@ -100,24 +110,28 @@ class ETLPipeline:
         self.archive_dir = Path(config.get("paths.archive", "data/archive"))
         self.validator = validator or Validator(DEFAULT_RULES)
 
-    def promote_to_core(self, conn, load_id: str) -> Dict[str, str]:
-        """stg → core: protseduralarni to'g'ri tartibda chaqiradi."""
+    def promote_to_core(self, conn, load_id: str) -> Dict[str, Any]:
+        """stg → core: faqat manbasi bo'sh bo'lmagan protseduralarni chaqiradi."""
         cur = conn.cursor
-        procedures = [
-            "core.usp_LoadDimensions",
-            "core.usp_LoadProducts",
-            "core.usp_LoadSales",
-        ]
-        cur.execute(
-            "SELECT COUNT(*) FROM stg.RawReturns WHERE LoadId = ?",
-            (load_id,),
-        )
-        if cur.fetchone()[0] > 0:
-            procedures.append("core.usp_LoadReturns")
-        for proc in procedures:
+        executed, skipped = [], []
+
+        for proc, tables in PROC_SOURCES:
+            total = 0
+            for tbl in tables:
+                cur.execute(f"SELECT COUNT(*) FROM {tbl} WHERE LoadId = ?", (load_id,))
+                row = cur.fetchone()
+                total += row[0] if row else 0
+
+            if total == 0:
+                logger.info("%s o'tkazib yuborildi — manbada qator yo'q", proc)
+                skipped.append(proc)
+                continue
+
             cur.execute(f"EXEC {proc} @LoadId = ?", (load_id,))
-            logger.info("%s bajarildi [LoadId=%s]", proc, load_id)
-        return {"load_id": load_id, "status": "core_promoted"}
+            logger.info("%s bajarildi [manbada %s qator]", proc, total)
+            executed.append(proc)
+
+        return {"load_id": load_id, "executed": executed, "skipped": skipped}
 
     def promote_to_mart(self, conn, date_from: str, date_to: str) -> Dict[str, str]:
         """core → mart: kunlik faktlarni yangilaydi."""
@@ -184,6 +198,15 @@ class ETLPipeline:
         # B-05: katalog va spravochniklar sikldan oldin
         catalog = _build_price_catalog(self.input_dir)
         stores, employees = _load_reference_dicts(self.input_dir)
+
+        store_codes = {
+            str(code).strip().upper()
+            for code in stores
+            if code
+        }
+        for rule in self.validator.rules:
+            if isinstance(rule, StoreExistsRule):
+                rule.known_stores = store_codes
 
         with DatabaseConnection(db_config) as conn:
             loader = StagingLoader(conn.cursor, self.config, load_id)

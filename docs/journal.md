@@ -36,3 +36,16 @@ Tahliliy Ko'rinishlar (Views): Hisobotlar va tahlillar uchun kerakli bo'lgan 5 t
 Tuzatish sessiyasi (qo'llanma v2): P-01..P-18, S-01..S-14, D-01..D-06, R-08/R-09.
 Data Pack data/incoming/ ga chiqarildi; StagingLoader/LoadLog/SQL MERGE DDL ga moslandi; pytest 44 passed.
 
+---
+
+## Yakuniy tuzatishlar (qo'llanma v4)
+
+- **A-01:** `promote_to_core` — `PROC_SOURCES` xaritasi, bo'sh manba o'tkazib yuboriladi
+- **A-02:** `StoreExistsRule`, `FutureDateRule`; JSON da 12 qoida faol (`SKU_EXISTS`, `RETURN_AFTER_SALE` ham)
+- **A-03:** `logger.handlers` tekshiruvi — `logs/{LoadId}.log` yoziladi
+- **A-04:** `full_sales_date_range` xato xabari aniqroq
+- **A-05:** `requirements.txt` UTF-8
+- **C-01/C-02:** `a.out` o'chirildi, `.gitignore`, `usp_LoadSales.sql` qator yakuni
+- **Hujjatlar:** ANALYSIS (24 savol), performance (S7), profiling, data_dictionary, normalization, README to'liq
+- **Testlar:** 52 passed (`promote_to_core`, `FutureDateRule`, `StoreExistsRule`)
+

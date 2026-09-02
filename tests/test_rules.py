@@ -15,6 +15,8 @@ from src.validate.rules import (
     QtyPositiveRule,
     ReturnAfterSaleRule,
     SkuExistsRule,
+    StoreExistsRule,
+    FutureDateRule,
     SkuRequiredRule,
     CashierStoreRule,
     ValidationRule,
@@ -109,3 +111,18 @@ def test_cashier_store_rule():
     assert rule.check({"store_code": "ST-001", "cashier_store_code": "ST-001"}) is True
     assert rule.check({"store_code": "ST-001", "cashier_store_code": "ST-002"}) is False
     assert rule.check({"store_code": "ST-001"}) is True  # enrich yo'q
+
+
+def test_store_exists_rule():
+    rule = StoreExistsRule(known_stores={"ST-001", "ST-002"})
+    assert rule.check({"store_code": "ST-001"}) is True
+    assert rule.check({"store_code": "st-001"}) is True
+    assert rule.check({"store_code": "ST-999"}) is False
+    assert StoreExistsRule().check({"store_code": "ST-999"}) is True  # spravochnik yo'q
+
+
+def test_future_date_rule():
+    rule = FutureDateRule()
+    assert rule.check({"sale_datetime": datetime(2027, 1, 1)}) is False
+    assert rule.check({"sale_datetime": datetime(2026, 1, 1)}) is True
+    assert rule.check({}) is True

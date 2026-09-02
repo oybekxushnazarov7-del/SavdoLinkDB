@@ -44,3 +44,26 @@ def test_pipeline_dry_run_rollback(mock_db_cls, tmp_path):
 
     mock_conn.rollback.assert_called()
     assert "rows_read" in stats
+
+
+def test_promote_to_core_bosh_manbani_otkazib_yuboradi():
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor = mock_cursor
+    # Dimensions: 12 qator (4 jadval), qolganlari 0
+    mock_cursor.fetchone.side_effect = [(12,), (0,), (0,), (0,), (0,), (0,), (0,)]
+
+    config = Config({
+        "db": {"driver": "ODBC Driver 17 for SQL Server", "server": "localhost",
+               "database": "SavdoLinkDB", "trusted_connection": True},
+        "paths": {"incoming": "data/incoming", "archive": "data/archive", "rejected": "data/rejected"},
+    })
+    pipeline = ETLPipeline(config, validator=Validator(DEFAULT_RULES))
+
+    result = pipeline.promote_to_core(mock_conn, "LOAD-TEST")
+
+    assert "core.usp_LoadDimensions" in result["executed"]
+    assert "core.usp_LoadProducts" in result["skipped"]
+    assert "core.usp_LoadSales" in result["skipped"]
+    assert "core.usp_LoadReturns" in result["skipped"]
+    assert mock_cursor.execute.call_count == 8  # 7 COUNT + 1 EXEC

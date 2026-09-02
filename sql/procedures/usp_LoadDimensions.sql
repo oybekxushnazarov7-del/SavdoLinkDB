@@ -47,7 +47,10 @@ BEGIN
                 LTRIM(RTRIM(City))                   AS City,
                 LTRIM(RTRIM(Region))                 AS Region,
                 TRY_CONVERT(DATE, OpenedDate)        AS OpenedDate,
-                TRY_CONVERT(INT, AreaM2)             AS AreaM2
+                CASE
+                    WHEN TRY_CONVERT(INT, AreaM2) > 0 THEN TRY_CONVERT(INT, AreaM2)
+                    ELSE NULL
+                END                                  AS AreaM2
             FROM stg.RawStores
             WHERE LoadId = @LoadId
               AND NULLIF(LTRIM(RTRIM(StoreCode)), '') IS NOT NULL
@@ -82,7 +85,11 @@ BEGIN
                 LTRIM(RTRIM(FullName))    AS FullName,
                 LTRIM(RTRIM(StoreCode))   AS StoreCode,
                 LTRIM(RTRIM(Position))    AS Position,
-                TRY_CONVERT(DECIMAL(12,2), REPLACE(Salary, ',', '.')) AS Salary,
+                CASE
+                    WHEN TRY_CONVERT(DECIMAL(12,2), REPLACE(REPLACE(Salary, ' ', ''), ',', '.')) >= 0
+                    THEN TRY_CONVERT(DECIMAL(12,2), REPLACE(REPLACE(Salary, ' ', ''), ',', '.'))
+                    ELSE NULL
+                END                       AS Salary,
                 TRY_CONVERT(DATE, HiredDate) AS HiredDate,
                 LTRIM(RTRIM(ManagerCode)) AS ManagerCode,
                 TRY_CONVERT(BIT, IsActive) AS IsActive
@@ -146,8 +153,8 @@ BEGIN
         JOIN core.Category p ON p.CategoryCode = LTRIM(RTRIM(r.ParentCategoryCode))
         WHERE NULLIF(LTRIM(RTRIM(r.ParentCategoryCode)), '') IS NOT NULL;
 
-        -- 5. Supplier
-        ;WITH src_sup AS (
+        -- 5. Supplier (bir xil INN dublikatlari — birinchisini olamiz)
+        ;WITH src_sup_raw AS (
             SELECT DISTINCT
                 LTRIM(RTRIM(Inn)) AS Inn,
                 LTRIM(RTRIM(SupplierName)) AS SupplierName,
@@ -156,6 +163,16 @@ BEGIN
             FROM stg.RawSuppliers
             WHERE LoadId = @LoadId
               AND NULLIF(LTRIM(RTRIM(Inn)), '') IS NOT NULL
+              AND LEN(LTRIM(RTRIM(Inn))) = 9
+        ),
+        src_sup AS (
+            SELECT Inn, SupplierName, Country, ContractDate
+            FROM (
+                SELECT *,
+                    ROW_NUMBER() OVER (PARTITION BY Inn ORDER BY SupplierName) AS rn
+                FROM src_sup_raw
+            ) d
+            WHERE rn = 1
         )
         MERGE core.Supplier AS tgt
         USING src_sup AS src

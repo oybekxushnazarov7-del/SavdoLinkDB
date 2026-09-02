@@ -6,6 +6,10 @@
     "QTY_POSITIVE":     { "enabled": true, "severity": "ERROR" },
     "PRICE_IS_NUMERIC": { "enabled": true, "severity": "ERROR" },
     "DISCOUNT_RANGE":   { "enabled": true, "severity": "ERROR", "min": 0, "max": 100 },
+    "SKU_EXISTS":       { "enabled": true, "severity": "ERROR" },
+    "STORE_EXISTS":     { "enabled": true, "severity": "ERROR" },
+    "FUTURE_DATE":      { "enabled": true, "severity": "ERROR" },
+    "RETURN_AFTER_SALE":{ "enabled": true, "severity": "ERROR" },
     "PRICE_DEVIATION":  { "enabled": true, "severity": "WARNING", "max_factor": 1.5 },
     "CASHIER_STORE":    { "enabled": true, "severity": "WARNING" }
   },
